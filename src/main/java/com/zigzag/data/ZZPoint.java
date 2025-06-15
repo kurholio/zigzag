@@ -15,8 +15,7 @@ public class ZZPoint {
     public double rsi14 = 0.0;
     public double momentum = 0.0;
     public double volatility = 0.0;
-    public double percentFromZigZag = 0.0;
-    public int barsSinceZigZag = 0;
+
 
     public ZZPoint() {}
     
@@ -43,8 +42,6 @@ public class ZZPoint {
         this.rsi14 = other.rsi14;
         this.momentum = other.momentum;
         this.volatility = other.volatility;
-        this.percentFromZigZag = other.percentFromZigZag;
-        this.barsSinceZigZag = other.barsSinceZigZag;
     }
     
     public boolean isZigZag() {

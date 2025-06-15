@@ -103,18 +103,7 @@ public class ZZCalculator {
 	            double rsi = 100 - (100 / (1 + rs));
 	            enrichedBar.rsi14 = round(rsi);
 	        }
-
-	        // Distance and bars from latest ZigZag
-	        for (int j = i; j >= 0; j--) {
-	            for (ZZPoint z : zigzags) {
-	                if (z.timestamp == ohlcBars.get(j).timestamp) {
-	                    ZZPoint lastZig = ohlcBars.get(j);
-	                    enrichedBar.percentFromZigZag = round(100.0 * (bar.close - lastZig.close) / lastZig.close);
-	                    enrichedBar.barsSinceZigZag = i - j;
-	                    break;
-	                }
-	            }
-	        }
+	        
 
 	        if (zigZagOnly) {
 		        if (enrichedBar.isZigZag()) {
