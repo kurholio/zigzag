@@ -1,0 +1,41 @@
+name: Deploy to Elastic Beanstalk (Maven)
+
+on:
+  push:
+    branches:
+      - main  # or your deployment branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+
+      - name: Create deployment ZIP
+        run: |
+          mkdir deploy
+          cp target/*.jar deploy/application.jar
+          echo "web: java -jar application.jar" > deploy/Procfile
+          cd deploy && zip -r ../app.zip . && cd ..
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v20
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: joppa        # Replace with actual EB app name
+          environment_name: Joppa-env        # Replace with actual EB env
+          region: us-east-2                  # Replace with your region
+          version_label: github-${{ github.run_number }}
+          deployment_package: app.zip
