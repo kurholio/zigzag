@@ -3,7 +3,7 @@ name: Deploy to Elastic Beanstalk (Maven)
 on:
   push:
     branches:
-      - main  # or your deployment branch
+      - master  # or your deployment branch
 
 jobs:
   deploy:
