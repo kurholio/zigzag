@@ -16,10 +16,8 @@ import com.zigzag.data.ZZTradePrediction;
 
 public class OpenAIPredictor {
 	  private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-	  private static final String OPENAI_AK = "sk-proj-yrlN7NSELzWqqw-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";
+	  private static final String OPENAI_AK = "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";
 	  private static final ObjectMapper mapper = new ObjectMapper();
-	  
-	  
 
 	
 	public static ZZTradePrediction getPredictionFromGPT(List<ZZPoint> enrichedPoints) throws IOException, InterruptedException {
