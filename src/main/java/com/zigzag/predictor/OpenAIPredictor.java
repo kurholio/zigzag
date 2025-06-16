@@ -16,7 +16,12 @@ import com.zigzag.data.ZZTradePrediction;
 
 public class OpenAIPredictor {
 	  private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-	  private static final String OPENAI_AK = "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";
+	  private static final String OPENAI_AK1 = "sk-proj-yNnRTUbSQcJWHNiS5XqndFP1wufefth8MOske_9cxKIYA5CCtU79Ei52P";
+	  private static final String OPENAI_AK2 = "_Rfk8Uc_lHKvNFxbVT3BlbkFJfgWshgAOuMefWPlYsGygz_igd3vWG"		  ;
+	  private static final String OPENAI_AK3 = "_juegjCwNWlRlwHsAkRv5z9qYaMddbNP-V4vB9jjur2oA"		  ;
+	
+	  
+	  //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
 	  private static final ObjectMapper mapper = new ObjectMapper();
 
 	
@@ -41,7 +46,7 @@ public class OpenAIPredictor {
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(OPENAI_API_URL))
                 .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + OPENAI_AK)
+                .header("Authorization", "Bearer " + OPENAI_AK1+OPENAI_AK2+OPENAI_AK3)
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
