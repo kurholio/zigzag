@@ -21,7 +21,7 @@
     }
 
     .container {
-      max-width: 700px;
+      max-width: 90%;
       margin: auto;
       background: #fff;
       padding: 30px 40px;
@@ -118,11 +118,29 @@
       margin-top: 30px;
       height: 500px;
       position: relative;
+	  background: #f0f0f0;
+	  padding: 15px;
+	  border-radius: 5px;
     }
 
     canvas {
       width: 100% !important;
       height: 100% !important;
+    }
+
+    .export-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .export-buttons button {
+      background-color: #343a40;
+      color: white;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
     }
 
     @media (min-width: 600px) {
@@ -178,6 +196,10 @@
     <pre id="result"></pre>
     <div id="chart-container">
       <canvas id="chart"></canvas>
+    </div>
+    <div class="export-buttons">
+      <button onclick="downloadChart()">Download Chart</button>
+      <button onclick="exportData()">Export Data</button>
     </div>
   </div>
 
@@ -241,9 +263,9 @@
               type: 'line',
               label: 'Close',
               data: closes,
-              borderColor: '#007bff',
-              borderWidth: 1,
-              fill: false,
+              borderColor: '#aaa',
+              borderWidth: 2,
+              fill: true,
               pointRadius: 0,
               yAxisID: 'y1'
             },
@@ -251,9 +273,9 @@
               type: 'scatter',
               label: 'ZigZags',
               data: zigzagPoints,
-              pointRadius: 10,
+              pointRadius: 16,
               backgroundColor: ctx => ctx.raw.type === 'HIGH' ? 'green' : 'orange',
-              borderColor: '#d0a5f5',
+              borderColor: '#000',
               borderWidth: 2,
               pointStyle: 'circle',
               yAxisID: 'y1'
@@ -276,8 +298,7 @@
               callbacks: {
                 title: function(ctx) {
                   const d = ctx[0].raw;
-                  if (d && d.type) return `ZigZag - ${d.type}`;
-                  return d && d.timestamp ? new Date(d.timestamp * 1000).toLocaleString() : ctx[0].label;
+                  return d && d.type ? `ZigZag - ${d.type}` : new Date(ctx[0].parsed.x).toLocaleString();
                 },
                 label: function(ctx) {
                   const d = ctx.raw;
@@ -316,6 +337,22 @@
         }
       });
     }
+	
+	function downloadChart() {
+	     const a = document.createElement('a');
+	     a.href = zigzagChart.toBase64Image();
+	     a.download = 'zigzag_chart.png';
+	     a.click();
+	   }
+
+	   function exportData() {
+	     const text = document.getElementById("result").innerText;
+	     const blob = new Blob([text], { type: 'application/json' });
+	     const a = document.createElement('a');
+	     a.href = URL.createObjectURL(blob);
+	     a.download = 'zigzag_data.json';
+	     a.click();
+	   }
   </script>
 </body>
 </html>
