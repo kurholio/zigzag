@@ -34,8 +34,8 @@ public class ZZController {
     }
     
     ///api/zigzag/XBTUSD?interval=60&leftBars=5&leftBars=5&percentChange=3
-    @GetMapping("/zigzag/{pair}")
-    public ResponseEntity<List<com.zigzag.data.ZZPoint>> zigzag(
+    @GetMapping("/zigzag/zz/{pair}")
+    public ResponseEntity<List<com.zigzag.data.ZZPoint>> zigzagZZ(
             @PathVariable String pair,
             @RequestParam(defaultValue = "60") Integer interval,
             @RequestParam(defaultValue = "5") Integer leftBars,

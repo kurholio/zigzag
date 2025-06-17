@@ -1,11 +1,321 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>ZigZag App</title>
+  <meta charset="UTF-8" />
+  <title>ZigZag Predictor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.3/build/global/luxon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f8f9fa;
+      padding: 20px;
+      margin: 0;
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: #fff;
+      padding: 30px 40px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .form-group {
+      display: flex;
+      margin-bottom: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .form-group label {
+      flex: 1 0 100%;
+      font-weight: 500;
+      color: #444;
+      margin-bottom: 5px;
+    }
+
+    .form-group input,
+    .form-group select {
+      flex: 1 0 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .buttons button {
+      padding: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .buttons button.predict { background-color: #007bff; }
+    .buttons button.predict:hover { background-color: #0056b3; }
+    .buttons button.all { background-color: #28a745; }
+    .buttons button.all:hover { background-color: #1e7e34; }
+    .buttons button.zz { background-color: #6f42c1; }
+    .buttons button.zz:hover { background-color: #4a2e91; }
+
+    .spinner {
+      display: none;
+      margin-top: 15px;
+      font-style: italic;
+      color: #555;
+    }
+
+    .spinner:before {
+      content: "";
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 3px solid #ccc;
+      border-top: 3px solid #007bff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    pre {
+      background: #f0f0f0;
+      padding: 15px;
+      border-radius: 5px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 14px;
+      height: 250px;
+      max-height: 250px;
+    }
+
+    #chart-container {
+      margin-top: 30px;
+      height: 500px;
+      position: relative;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    @media (min-width: 600px) {
+      .form-group {
+        flex-direction: row;
+      }
+      .form-group label, .form-group input, .form-group select {
+        flex: 1;
+      }
+    }
+  </style>
 </head>
 <body>
-  <h1>Hello from ZigZag</h1>
-  <script src="/js/main.js"></script>
+  <div class="container">
+    <h2>ZigZag Prediction Tool</h2>
+    <form onsubmit="event.preventDefault();">
+      <div class="form-group">
+        <label for="pair">Trading Pair:</label>
+        <input type="text" id="pair" value="XBTUSD" required />
+      </div>
+      <div class="form-group">
+        <label for="interval">Interval (minutes):</label>
+        <select id="interval">
+          <option value="1">1 min</option>
+          <option value="5">5 min</option>
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+          <option value="60" selected>60 min</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="leftBars">Left Bars:</label>
+        <input type="number" id="leftBars" value="5" min="1" />
+      </div>
+      <div class="form-group">
+        <label for="rightBars">Right Bars:</label>
+        <input type="number" id="rightBars" value="5" min="1" />
+      </div>
+      <div class="form-group">
+        <label for="percentChange">Percent Change Threshold:</label>
+        <input type="number" id="percentChange" value="3" min="1" />
+      </div>
+
+      <div class="buttons">
+        <button type="button" class="predict" onclick="submitRequest('predict', 'Calculating Prediction. May Take Some Time...')">Get Prediction</button>
+        <button type="button" class="all" onclick="submitRequest('all', 'Fetching Full ZigZag Data...')">List All Data</button>
+        <button type="button" class="zz" onclick="submitRequest('zz', 'Loading ZigZag Points Only...')">List ZigZags Only</button>
+      </div>
+    </form>
+
+    <div class="spinner" id="spinner">Loading...</div>
+    <h3>Result:</h3>
+    <pre id="result"></pre>
+    <div id="chart-container">
+      <canvas id="chart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    let zigzagChart;
+
+    async function submitRequest(endpoint, loadingText) {
+      const pair = document.getElementById("pair").value;
+      const interval = document.getElementById("interval").value;
+      const leftBars = document.getElementById("leftBars").value;
+      const rightBars = document.getElementById("rightBars").value;
+      const percentChange = document.getElementById("percentChange").value;
+
+      const url = `/api/zigzag/${endpoint}/${pair}?interval=${interval}&leftBars=${leftBars}&rightBars=${rightBars}&percentChange=${percentChange}`;
+
+      const spinner = document.getElementById("spinner");
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerText = "";
+      spinner.textContent = loadingText;
+      spinner.style.display = "block";
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Request failed");
+        const data = await response.json();
+        resultDiv.innerText = JSON.stringify(data, null, 2);
+
+        if (endpoint === "all") drawChart(data);
+      } catch (error) {
+        resultDiv.innerText = `❌ Error: ${error.message}`;
+      } finally {
+        spinner.style.display = "none";
+      }
+    }
+
+    function drawChart(data) {
+      const ctx = document.getElementById("chart").getContext("2d");
+
+      const labels = data.map(d => new Date(d.timestamp * 1000));
+      const closes = data.map(d => d.close);
+      const volumes = data.map(d => d.volume);
+
+      const zigzagPoints = data
+        .filter(d => d.type === 'HIGH' || d.type === 'LOW')
+        .map(d => ({
+          x: new Date(d.timestamp * 1000),
+          y: d.close,
+          ...d
+        }));
+
+      if (zigzagChart && typeof zigzagChart.destroy === 'function') {
+        zigzagChart.destroy();
+      }
+
+      zigzagChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              type: 'line',
+              label: 'Close',
+              data: closes,
+              borderColor: '#007bff',
+              borderWidth: 1,
+              fill: false,
+              pointRadius: 0,
+              yAxisID: 'y1'
+            },
+            {
+              type: 'scatter',
+              label: 'ZigZags',
+              data: zigzagPoints,
+              pointRadius: 10,
+              backgroundColor: ctx => ctx.raw.type === 'HIGH' ? 'green' : 'orange',
+              borderColor: '#d0a5f5',
+              borderWidth: 2,
+              pointStyle: 'circle',
+              yAxisID: 'y1'
+            },
+            {
+              label: 'Volume',
+              data: volumes,
+              backgroundColor: '#bbb',
+              yAxisID: 'y'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              displayColors: false,
+              callbacks: {
+                title: function(ctx) {
+                  const d = ctx[0].raw;
+                  if (d && d.type) return `ZigZag - ${d.type}`;
+                  return d && d.timestamp ? new Date(d.timestamp * 1000).toLocaleString() : ctx[0].label;
+                },
+                label: function(ctx) {
+                  const d = ctx.raw;
+                  if (typeof d !== 'object') return `${ctx.dataset.label}: ${ctx.raw}`;
+                  return [
+                    `Time: ${new Date(d.timestamp * 1000).toLocaleString()}`,
+                    `Open: ${d.open}`,
+                    `High: ${d.high}`,
+                    `Low: ${d.low}`,
+                    `Close: ${d.close}`,
+                    `Volume: ${d.volume}`
+                  ];
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: { tooltipFormat: 'MMM dd HH:mm' },
+              ticks: { display: false }
+            },
+            y: {
+              beginAtZero: true,
+              position: 'left',
+              title: { display: true, text: 'Volume' },
+              weight: 0.2
+            },
+            y1: {
+              beginAtZero: false,
+              position: 'right',
+              title: { display: true, text: 'Price' },
+              grid: { drawOnChartArea: false }
+            }
+          }
+        }
+      });
+    }
+  </script>
 </body>
 </html>
