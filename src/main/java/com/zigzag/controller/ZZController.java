@@ -1,8 +1,16 @@
 package com.zigzag.controller;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
+import org.knowm.xchange.currency.Currency;
+import org.knowm.xchange.dto.Order;
+import org.knowm.xchange.dto.account.Balance;
+import org.knowm.xchange.dto.marketdata.Trade;
+import org.knowm.xchange.kraken.dto.trade.KrakenOrder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,8 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.zigzag.data.ZZCalculator;
 import com.zigzag.data.ZZPoint;
 import com.zigzag.data.ZZTradePrediction;
+import com.zigzag.markets.BinanceUSManager;
 import com.zigzag.markets.KrakenManager;
 import com.zigzag.predictor.OpenAIPredictor;
+import com.zigzag.services.KrakenService;
 
 
 
@@ -23,6 +33,12 @@ import com.zigzag.predictor.OpenAIPredictor;
 @RestController
 public class ZZController {
 
+
+     @Autowired
+     private KrakenService krakenService;
+     
+     
+	 
     @GetMapping("/hello")
     public String hello() {
         return "Hello from backend!";
@@ -33,6 +49,36 @@ public class ZZController {
         return "Hello from catalogsssssssssssssssssssssssssssssssssssssss!";
     }
     
+    @GetMapping("/balance/all")
+    public ResponseEntity<Map<String, BigDecimal>> getBalances() {
+        return ResponseEntity.ok(krakenService.getBalances());
+    }
+
+    @GetMapping("/balance/base/{symbol}")
+    public ResponseEntity<BigDecimal> getBalancel(@PathVariable String symbol) {
+        return ResponseEntity.ok(krakenService.getBalance(symbol));
+    }
+
+    @GetMapping("/trades/all")
+    public ResponseEntity<List<Trade>> getTrades() {
+        return ResponseEntity.ok(krakenService.getTrades());
+    }
+
+    @GetMapping("/trades/pair/{pair}")
+    public ResponseEntity<List<Trade>> getTrades(@PathVariable String pair) {
+        return ResponseEntity.ok(krakenService.getTrades(pair));
+    }
+    @GetMapping("/orders/all")
+    public ResponseEntity<Map<String, KrakenOrder>> getOrders() {
+        return ResponseEntity.ok(krakenService.getOrders());
+    }
+    
+
+    @GetMapping("/orders/pair/{pair}")
+    public ResponseEntity<List<KrakenOrder>> getOrders(@PathVariable String pair) {
+        return ResponseEntity.ok(krakenService.getOrders(pair));
+    }
+    
     ///api/zigzag/XBTUSD?interval=60&leftBars=5&leftBars=5&percentChange=3
     @GetMapping("/zigzag/zz/{pair}")
     public ResponseEntity<List<com.zigzag.data.ZZPoint>> zigzagZZ(
@@ -40,17 +86,18 @@ public class ZZController {
             @RequestParam(defaultValue = "60") Integer interval,
             @RequestParam(defaultValue = "5") Integer leftBars,
             @RequestParam(defaultValue = "5") Integer rightBars,
-            @RequestParam(defaultValue = "3") Integer percentChange) {
+            @RequestParam(defaultValue = "3") Integer percentChange,
+            @RequestParam(defaultValue = "30") Integer daysBack) {
 
         try {
-            List<com.zigzag.data.ZZPoint> bars = com.zigzag.markets.KrakenManager.fetchOHLC(pair, interval);
+        	List<ZZPoint> bars = new BinanceUSManager().getHistoricalData(pair, daysBack,interval);
             List<ZZPoint> zigzag = ZZCalculator.calculateZigZag(bars, leftBars, rightBars, percentChange);
             zigzag = ZZCalculator.generateFeatureEnrichedZZPoints(bars, zigzag,true);
             System.out.println("ZigZag Pivot Points:");
             zigzag.forEach(System.out::println);
 
             return ResponseEntity.ok(zigzag); // ✅ Automatically serialized as JSON
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                                  .body(Collections.emptyList()); // or return a structured error if needed
@@ -63,17 +110,18 @@ public class ZZController {
             @RequestParam(defaultValue = "60") Integer interval,
             @RequestParam(defaultValue = "5") Integer leftBars,
             @RequestParam(defaultValue = "5") Integer rightBars,
-            @RequestParam(defaultValue = "3") Integer percentChange) {
+            @RequestParam(defaultValue = "3") Integer percentChange,
+            @RequestParam(defaultValue = "30") Integer daysBack) {
 
         try {
-            List<ZZPoint> bars = KrakenManager.fetchOHLC(pair, interval);
+            List<ZZPoint> bars = new BinanceUSManager().getHistoricalData(pair, daysBack,interval);
             List<ZZPoint> zigzag = ZZCalculator.calculateZigZag(bars, leftBars, rightBars, percentChange);
             zigzag = ZZCalculator.generateFeatureEnrichedZZPoints(bars, zigzag, false);
-            System.out.println("ZigZag Pivot Points:");
-            zigzag.forEach(System.out::println);
+            System.out.println("ZigZag Pivot Points: "+zigzag.size());
+            //zigzag.forEach(System.out::println);
 
             return ResponseEntity.ok(zigzag); // ✅ Automatically serialized as JSON
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                                  .body(Collections.emptyList()); // or return a structured error if needed
@@ -86,10 +134,11 @@ public class ZZController {
             @RequestParam(defaultValue = "60") Integer interval,
             @RequestParam(defaultValue = "5") Integer leftBars,
             @RequestParam(defaultValue = "5") Integer rightBars,
-            @RequestParam(defaultValue = "3") Integer percentChange) {
+            @RequestParam(defaultValue = "3") Integer percentChange,
+            @RequestParam(defaultValue = "30") Integer daysBack) {
 
         try {
-            List<ZZPoint> bars = KrakenManager.fetchOHLC(pair, interval);
+        	List<ZZPoint> bars = new BinanceUSManager().getHistoricalData(pair, daysBack,interval);
             List<ZZPoint> zigzag = ZZCalculator.calculateZigZag(bars, leftBars, rightBars, percentChange);
             
             zigzag = ZZCalculator.generateFeatureEnrichedZZPoints(bars, zigzag,false);

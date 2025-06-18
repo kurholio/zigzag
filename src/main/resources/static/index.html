@@ -78,6 +78,13 @@
     .buttons button.zz { background-color: #6f42c1; }
     .buttons button.zz:hover { background-color: #4a2e91; }
 
+    .buttons button.trades { background-color: #90a638; }
+    .buttons button.trades:hover { background-color: rgb(152, 166, 78); }
+    .buttons button.orders { background-color: #8238cb; }
+    .buttons button.orders:hover { background-color: #8e62bd; }
+    .buttons button.balance { background-color: #2e3945; }
+    .buttons button.balance:hover { background-color: #868a8f; }
+
     .spinner {
       display: none;
       margin-top: 15px;
@@ -142,7 +149,25 @@
       border-radius: 5px;
       cursor: pointer;
     }
-
+   .buttons-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    @media (max-width: 700px) {
+      .buttons-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 500px) {
+      .buttons-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .buttons-grid button {
+      width: 100%;
+    }
     @media (min-width: 600px) {
       .form-group {
         flex-direction: row;
@@ -153,42 +178,84 @@
     }
   </style>
 </head>
-<body>
+<body> 
   <div class="container">
-    <h2>ZigZag Prediction Tool</h2>
     <form onsubmit="event.preventDefault();">
       <div class="form-group">
-        <label for="pair">Trading Pair:</label>
-        <input type="text" id="pair" value="XBTUSD" required />
+        <H1><label for="pair">ZigZag&nbsp;&nbsp;  </label></H1>
+        <div style="display: flex; gap: 10px;">
+          <input type="text" id="base" value="BTC" required placeholder="Base (e.g. BTC)" style="flex:1; max-width:80px;" />
+          <span style="align-self: center;">/</span>
+          <input type="text" id="counter" value="USD" required placeholder="Counter (e.g. USD)" style="flex:1; max-width:80px;" />
+        </div>
       </div>
-      <div class="form-group">
-        <label for="interval">Interval (minutes):</label>
-        <select id="interval">
-          <option value="1">1 min</option>
-          <option value="5">5 min</option>
-          <option value="15">15 min</option>
-          <option value="30">30 min</option>
-          <option value="60" selected>60 min</option>
-        </select>
+      <div class="form-row" style="display: flex; gap: 24px; justify-content: space-between; width: 100%;">
+        <div class="form-group" style="flex:1; min-width: 160px; flex-direction: column; align-items: flex-start;">
+          <label for="interval" style="white-space: nowrap; text-align: left; align-self: flex-start;">Interval:</label>
+          <select id="interval" style="width: 100%;">
+            <option value="1">1 min</option>
+            <option value="5">5 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60" selected>60 min</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1; min-width: 120px; flex-direction: column; align-items: flex-start;">
+          <label for="percentChange" style="white-space: nowrap; text-align: left; align-self: flex-start;">Change Threshold (%):</label>
+          <input type="number" id="percentChange" value="3" min="1" style="width: 100%;" />
+        </div>
+		<div class="form-group" style="flex:1; min-width: 120px; flex-direction: column; align-items: flex-start;">
+		        <label for="percentChange" style="white-space: nowrap; text-align: left; align-self: flex-start;">Days Back:</label>
+		        <input type="number" id="daysBack" value="10" min="1" style="width: 100%;" />
+		      </div>
+        <div class="form-group" style="flex:1; min-width: 120px; flex-direction: column; align-items: flex-start;">
+          <label for="leftBars" style="white-space: nowrap; text-align: left; align-self: flex-start;">Left Bars:</label>
+          <input type="number" id="leftBars" value="5" min="1" style="width: 100%;" />
+        </div>
+        <div class="form-group" style="flex:1; min-width: 120px; flex-direction: column; align-items: flex-start;">
+          <label for="rightBars" style="white-space: nowrap; text-align: left; align-self: flex-start;">Right Bars:</label>
+          <input type="number" id="rightBars" value="5" min="1" style="width: 100%;" />
+        </div>
       </div>
-      <div class="form-group">
-        <label for="leftBars">Left Bars:</label>
-        <input type="number" id="leftBars" value="5" min="1" />
-      </div>
-      <div class="form-group">
-        <label for="rightBars">Right Bars:</label>
-        <input type="number" id="rightBars" value="5" min="1" />
-      </div>
-      <div class="form-group">
-        <label for="percentChange">Percent Change Threshold:</label>
-        <input type="number" id="percentChange" value="3" min="1" />
-      </div>
+      <style>
+        .form-row {
+          display: flex;
+          gap: 16px;
+          flex-wrap: wrap;
+          margin-bottom: 20px;
+        }
+        .form-row .form-group {
+          display: flex;
+          flex-direction: column;
+        }
+        .form-row .form-group label {
+          white-space: nowrap;
+          margin-bottom: 5px;
+        }
+        @media (max-width: 900px) {
+          .form-row {
+        flex-direction: column;
+        gap: 0;
+          }
+          .form-row .form-group {
+        min-width: 0;
+        width: 100%;
+          }
+        }
+      </style>
+      
 
-      <div class="buttons">
-        <button type="button" class="predict" onclick="submitRequest('predict', 'Calculating Prediction. May Take Some Time...')">Get Prediction</button>
-        <button type="button" class="all" onclick="submitRequest('all', 'Fetching Full ZigZag Data...')">List All Data</button>
-        <button type="button" class="zz" onclick="submitRequest('zz', 'Loading ZigZag Points Only...')">List ZigZags Only</button>
+      <div class="buttons buttons-grid">
+        <button type="button" class="predict" onclick="submitZigZagRequest('predict', 'Calculating Prediction. May Take Some Time...')">Get Prediction</button>
+        <button type="button" class="all" onclick="submitZigZagRequest('all', 'Fetching Full ZigZag Data...')">List All Data</button>
+        <button type="button" class="zz" onclick="submitZigZagRequest('zz', 'Loading ZigZag Points Only...')">List ZigZags Only</button>
+        <button type="button" class="trades" onclick="submitPairRequest('trades/pair', 'Getting Trades. May Take Some Time...')">Show Trades</button>
+        <button type="button" class="orders" onclick="submitPairRequest('orders/pair', 'Fetching Orders...')">List Orders</button>
+        <button type="button" class="balance" onclick="submitBaseRequest('balance/base', 'Loading Balance...')">Check Balance</button>
       </div>
+      <style>
+       
+      </style>
     </form>
 
     <div class="spinner" id="spinner">Loading...</div>
@@ -206,14 +273,17 @@
   <script>
     let zigzagChart;
 
-    async function submitRequest(endpoint, loadingText) {
-      const pair = document.getElementById("pair").value;
+    async function submitZigZagRequest(endpoint, loadingText) {
+      const base = document.getElementById("base").value.trim();
+      const counter = document.getElementById("counter").value.trim();
+      const pair = base + counter;
       const interval = document.getElementById("interval").value;
       const leftBars = document.getElementById("leftBars").value;
       const rightBars = document.getElementById("rightBars").value;
       const percentChange = document.getElementById("percentChange").value;
+	  const daysBack = document.getElementById("daysBack").value;
 
-      const url = `/api/zigzag/${endpoint}/${pair}?interval=${interval}&leftBars=${leftBars}&rightBars=${rightBars}&percentChange=${percentChange}`;
+      const url = `/api/zigzag/${endpoint}/${pair}?interval=${interval}&leftBars=${leftBars}&rightBars=${rightBars}&percentChange=${percentChange}&daysBack=${daysBack}`;
 
       const spinner = document.getElementById("spinner");
       const resultDiv = document.getElementById("result");
@@ -235,17 +305,71 @@
       }
     }
 
+    async function submitPairRequest(endpoint, loadingText) {
+      const base = document.getElementById("base").value.trim();
+      const counter = document.getElementById("counter").value.trim();
+      const pair = base + counter;
+      
+      const url = `/api/${endpoint}/${pair}?`;
+
+      const spinner = document.getElementById("spinner");
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerText = "";
+      spinner.textContent = loadingText;
+      spinner.style.display = "block";
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Request failed");
+        const data = await response.json();
+        resultDiv.innerText = JSON.stringify(data, null, 2);
+
+        if (endpoint === "all") drawChart(data);
+      } catch (error) {
+        resultDiv.innerText = `❌ Error: ${error.message}`;
+      } finally {
+        spinner.style.display = "none";
+      }
+    }
+
+     async function submitBaseRequest(endpoint, loadingText) {
+      const base = document.getElementById("base").value.trim();
+      
+      
+      const url = `/api/${endpoint}/${base}?`;
+
+      const spinner = document.getElementById("spinner");
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerText = "";
+      spinner.textContent = loadingText;
+      spinner.style.display = "block";
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Request failed");
+        const data = await response.json();
+        resultDiv.innerText = JSON.stringify(data, null, 2);
+
+        if (endpoint === "all") drawChart(data);
+      } catch (error) {
+        resultDiv.innerText = `❌ Error: ${error.message}`;
+      } finally {
+        spinner.style.display = "none";
+      }
+    }
+
+
     function drawChart(data) {
       const ctx = document.getElementById("chart").getContext("2d");
 
-      const labels = data.map(d => new Date(d.timestamp * 1000));
+      const labels = data.map(d => new Date(d.timestamp));
       const closes = data.map(d => d.close);
       const volumes = data.map(d => d.volume);
 
       const zigzagPoints = data
         .filter(d => d.type === 'HIGH' || d.type === 'LOW')
         .map(d => ({
-          x: new Date(d.timestamp * 1000),
+          x: new Date(d.timestamp),
           y: d.close,
           ...d
         }));
@@ -283,7 +407,7 @@
             {
               label: 'Volume',
               data: volumes,
-              backgroundColor: '#bbb',
+              backgroundColor: '#000',
               yAxisID: 'y'
             }
           ]
@@ -304,7 +428,7 @@
                   const d = ctx.raw;
                   if (typeof d !== 'object') return `${ctx.dataset.label}: ${ctx.raw}`;
                   return [
-                    `Time: ${new Date(d.timestamp * 1000).toLocaleString()}`,
+                    `Time: ${new Date(d.timestamp).toLocaleString()}`,
                     `Open: ${d.open}`,
                     `High: ${d.high}`,
                     `Low: ${d.low}`,
