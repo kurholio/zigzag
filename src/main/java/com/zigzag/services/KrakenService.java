@@ -268,14 +268,20 @@ public class KrakenService {
     
     
     public void connectWebSocketTicker(String krakenPair) {
+    	
+    	
         try {
+        	if (krakenPair.equals("BTCUSD")) {
+        		krakenPair = "XBT/USD";
+        	}
+        	String symbol = krakenPair;
             wsClient = new WebSocketClient(new URI("wss://ws.kraken.com")) {
                 @Override
                 public void onOpen(ServerHandshake handshakedata) {
                     System.out.println("WebSocket Opened. Subscribing...");
                     String subscribeMessage = String.format(
                         "{\"event\":\"subscribe\", \"pair\":[\"%s\"], \"subscription\":{\"name\":\"ticker\"}}",
-                        krakenPair
+                        symbol
                     );
                     send(subscribeMessage);
                 }
@@ -314,7 +320,20 @@ public class KrakenService {
             e.printStackTrace();
         }
     }
+    
+    public BigDecimal getLatestPrice() {
+    	if (latestPrices.size() > 0) {
+    		return latestPrices.values().iterator().next();
+    	} else {
+    		return new BigDecimal(0.0);
+    	}
+    }
+    
     public BigDecimal getLatestPrice(String krakenPair) {
+    	
+    	if (krakenPair.equals("BTCUSD")) {
+    		krakenPair = "XBT/USD";
+    	}
         return latestPrices.get(krakenPair);
     }
 }

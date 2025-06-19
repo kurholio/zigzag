@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.zigzag.data.ZZCalculator;
 import com.zigzag.data.ZZPoint;
+import com.zigzag.data.ZZSummary;
 import com.zigzag.data.ZZTradePrediction;
 import com.zigzag.markets.BinanceUSManager;
 import com.zigzag.markets.KrakenManager;
@@ -35,19 +36,19 @@ public class ZZController {
 
      @Autowired
      private KrakenService krakenService;
-     int cycleCount = 1;
+     int cycleCount = 0;
     
      ScheduledExecutorService scheduler;
      List<ZZPoint> allbars = new ArrayList<>();
      List<ZZPoint> zigzag = new ArrayList<>();
-     ZZTradePrediction prediction = null;
+     ZZTradePrediction prediction = new ZZTradePrediction();
      double balance  = 0;
-     List<KrakenOrder> orders;
-     List<Trade> trades;
+     List<KrakenOrder> orders=new ArrayList<>();
+     List<Trade> trades=new ArrayList<>();
      
     boolean running = false;
     boolean scheduled = false;
-     
+    ZZSummary summary = new ZZSummary();
 	 
     @GetMapping("/hello")
     public String hello() {
@@ -81,13 +82,8 @@ public class ZZController {
     }
     
     @GetMapping("/cycleCounter")
-    public ResponseEntity<Integer> cycleCounter() {
-    	try {
-    			return ResponseEntity.status(HttpStatus.OK).body(cycleCount);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(0); // or return a structured error if needed
-        }
+    public ResponseEntity<String> cycleCounter() {
+    	return ResponseEntity.status(HttpStatus.OK).body(cycleCount+"");
     }
     
     @GetMapping("/stop")
@@ -104,6 +100,13 @@ public class ZZController {
     @GetMapping("/balance/all")
     public ResponseEntity<Map<String, BigDecimal>> getBalances() {
         return ResponseEntity.ok(krakenService.getBalances());
+    }
+    
+    @GetMapping("/summary/header")
+    public ResponseEntity<ZZSummary> getSummaryHeader() {
+    	//ZZSummary s = new ZZSummary();
+    	summary.setFrom(prediction, krakenService.getLatestPrice().doubleValue());
+        return ResponseEntity.ok(summary);
     }
 
     @GetMapping("/balance/base/{symbol}")
@@ -151,17 +154,8 @@ public class ZZController {
     }
     
     @GetMapping("/zigzag/all/{pair}")
-    public ResponseEntity<List<ZZPoint>> zigzagAll(
-            @PathVariable String pair,
-            @RequestParam(defaultValue = "60") Integer interval,
-            @RequestParam(defaultValue = "5") Integer leftBars,
-            @RequestParam(defaultValue = "5") Integer rightBars,
-            @RequestParam(defaultValue = "3") Integer percentChange,
-            @RequestParam(defaultValue = "30") Integer daysBack) {
-
-       
-            return ResponseEntity.ok(allbars); // ✅ Automatically serialized as JSON
-       
+    public ResponseEntity<List<ZZPoint>> zigzagAll() {
+          return ResponseEntity.ok(allbars); // ✅ Automatically serialized as JSON
     }
     
     @GetMapping("/start")
@@ -173,7 +167,13 @@ public class ZZController {
             @RequestParam(defaultValue = "5") Integer rightBars,
             @RequestParam(defaultValue = "3") Integer percentChange,
             @RequestParam(defaultValue = "30") Integer daysBack) {
-
+    	summary.base = base;
+    	summary.counter = counter;
+    	summary.interval = interval;
+    	summary.leftBars = leftBars;
+    	summary.rightBars = rightBars;
+    	summary.percentChange = percentChange;
+    	summary.daysBack = daysBack;
         try {
         	scheduled = true;
         	startScheduledRun(base, counter, interval, leftBars, rightBars, percentChange, daysBack);
@@ -198,6 +198,7 @@ public class ZZController {
     	String pair = base+counter;
         try {
             running = true;
+            cycleCount++;
             if (krakenService.latestPrices.size() == 0) {
                 krakenService.connectWebSocketTicker(pair);
             }
