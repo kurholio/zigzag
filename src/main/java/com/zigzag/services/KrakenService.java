@@ -16,10 +16,12 @@ import org.java_websocket.handshake.ServerHandshake;
 import org.knowm.xchange.Exchange;
 import org.knowm.xchange.ExchangeFactory;
 import org.knowm.xchange.ExchangeSpecification;
+import org.knowm.xchange.currency.Currency;
 import org.knowm.xchange.currency.CurrencyPair;
 import org.knowm.xchange.dto.Order.OrderType;
 import org.knowm.xchange.dto.account.Balance;
 import org.knowm.xchange.dto.account.Wallet;
+import org.knowm.xchange.dto.marketdata.Ticker;
 import org.knowm.xchange.dto.marketdata.Trade;
 import org.knowm.xchange.dto.trade.LimitOrder;
 import org.knowm.xchange.dto.trade.StopOrder;
@@ -30,6 +32,7 @@ import org.knowm.xchange.kraken.dto.trade.KrakenOrder;
 import org.knowm.xchange.kraken.service.KrakenAccountService;
 import org.knowm.xchange.kraken.service.KrakenTradeHistoryParams;
 import org.knowm.xchange.kraken.service.KrakenTradeService;
+import org.knowm.xchange.service.marketdata.MarketDataService;
 import org.knowm.xchange.service.trade.params.TradeHistoryParamCurrencyPair;
 import org.springframework.stereotype.Service;
 
@@ -43,6 +46,7 @@ public class KrakenService {
 	private KrakenAccountService accountService;
 	private KrakenTradeService tradeService;
 	private WebSocketClient wsClient;
+	private MarketDataService marketDataService;
 	public Map<String, BigDecimal> latestPrices = new ConcurrentHashMap<>();
 	private String xmlAK = "u1KONtudYv6wdb6DIRWmrGTDV5es5Ivo4K4SHtYKFFTG+CGxKGDQiK4G";
 	private String xmpk = "XqeUljXl8uys1CdmT/oYh8Q/0+qjzwyztQIXQ4KriN4l13cU9Jaoe7DN8+ff3VeGl3Vtehw3/v3TbkVg4Gs5VQ==";
@@ -57,6 +61,7 @@ public class KrakenService {
         // Initialize services as final fields
         accountService = (KrakenAccountService) exchange.getAccountService();
         tradeService = (KrakenTradeService) exchange.getTradeService();
+        marketDataService  = exchange.getMarketDataService();
 	}
     
     
@@ -85,6 +90,41 @@ public class KrakenService {
 		}
         return wallet;
     }
+    
+    public Map<String, BigDecimal> getBalancesInUSD()  {
+        
+        Map<String, BigDecimal> balances = getBalances();
+        Map<String, BigDecimal> ret =new HashMap<>();
+
+        System.out.println("Balances in USD:");
+        for (Map.Entry<String, BigDecimal> entry : balances.entrySet()) {
+            String currency = entry.getKey();
+            BigDecimal total = entry.getValue();
+
+            if (total.compareTo(BigDecimal.ZERO) <= 0 ) continue;
+            
+            if (currency.equals(Currency.USD.toString())) {
+            	 ret.put(currency, total);
+            	 System.out.printf("%s: %.6f (%.2f USD)%n", currency.toString(), total, total);
+            	 continue;
+            }
+
+            CurrencyPair pair = new CurrencyPair(new Currency(currency), Currency.USD);
+            try {
+                Ticker ticker = marketDataService.getTicker(pair);
+                BigDecimal price = ticker.getLast();
+                BigDecimal valueInUsd = total.multiply(price);
+                if (valueInUsd.doubleValue()<1) {
+                	continue;
+                }
+                ret.put(currency, valueInUsd);
+                System.out.printf("%s: %.6f (%.2f USD)%n", currency.toString(), total, valueInUsd);
+            } catch (Exception e) {
+                System.out.printf("Could not fetch price for %s/USD: %s%n", currency, e.getMessage());
+            }
+        }
+        return ret;
+    }
 
     public Map<String, BigDecimal> getBalances() {
     	
@@ -96,6 +136,7 @@ public class KrakenService {
     	    for (Balance balance : wallet.getBalances().values()) {
     	        allBalances.merge(balance.getCurrency().getCurrencyCode(), balance.getTotal(), BigDecimal::add);
     	    }
+    	    break;
     	}
     	
     
@@ -274,6 +315,16 @@ public class KrakenService {
         	if (krakenPair.equals("BTCUSD")) {
         		krakenPair = "XBT/USD";
         	}
+        	
+        	
+			if (wsClient == null || wsClient.isClosed() || wsClient.isClosing() || wsClient.isFlushAndClose()) {
+				wsClient.close();
+				latestPrices.clear();
+			}
+
+			
+
+			// Create WebSocket client for Kraken ticker
         	String symbol = krakenPair;
             wsClient = new WebSocketClient(new URI("wss://ws.kraken.com")) {
                 @Override
@@ -296,6 +347,7 @@ public class KrakenService {
                             // "c" = last trade closed [ price, lot volume ]
                             String pair = json.get(json.size() - 1).asText();
                             BigDecimal price = new BigDecimal(json.get(1).get("c").get(0).asText());
+                            
                             latestPrices.put(pair, price);
                             System.out.println("Price update for " + pair + ": " + price);
                         }

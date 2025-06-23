@@ -3,6 +3,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
@@ -37,6 +38,9 @@ public class ZZController {
      @Autowired
      private KrakenService krakenService;
      int cycleCount = 0;
+     
+     Map<String, BigDecimal> balances = new HashMap<>();
+     Map<String, BigDecimal> usdBalances = new HashMap<>();
     
      ScheduledExecutorService scheduler;
      List<ZZPoint> allbars = new ArrayList<>();
@@ -49,6 +53,8 @@ public class ZZController {
     boolean running = false;
     boolean scheduled = false;
     ZZSummary summary = new ZZSummary();
+    
+    
 	 
     @GetMapping("/hello")
     public String hello() {
@@ -96,11 +102,7 @@ public class ZZController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()); // or return a structured error if needed
         }
     }
-    
-    @GetMapping("/balance/all")
-    public ResponseEntity<Map<String, BigDecimal>> getBalances() {
-        return ResponseEntity.ok(krakenService.getBalances());
-    }
+  
     
     @GetMapping("/summary/header")
     public ResponseEntity<ZZSummary> getSummaryHeader() {
@@ -132,6 +134,16 @@ public class ZZController {
     @GetMapping("/orders/pair/{pair}")
     public ResponseEntity<List<KrakenOrder>> getOrders(@PathVariable String pair) {
         return ResponseEntity.ok(orders);
+    }
+    
+    @GetMapping("/balance/all")
+    public ResponseEntity< Map<String, BigDecimal>> getBalances() {
+        return ResponseEntity.ok(balances);
+    }
+    
+    @GetMapping("/usdbalance/all")
+    public ResponseEntity< Map<String, BigDecimal>> getUsdBalances() {
+        return ResponseEntity.ok(usdBalances);
     }
     
     ///api/zigzag/XBTUSD?interval=60&leftBars=5&leftBars=5&percentChange=3
@@ -199,9 +211,9 @@ public class ZZController {
         try {
             running = true;
             cycleCount++;
-            if (krakenService.latestPrices.size() == 0) {
-                krakenService.connectWebSocketTicker(pair);
-            }
+            
+            krakenService.connectWebSocketTicker(pair);
+            
             List<ZZPoint> bars = new BinanceUSManager().getHistoricalData(pair, daysBack,interval);
             zigzag = ZZCalculator.calculateZigZag(bars, leftBars, rightBars, percentChange);
             balance = krakenService.getBalance(base).doubleValue();
@@ -226,6 +238,8 @@ public class ZZController {
             Thread.sleep(2000);
             orders = krakenService.getOrders(pair);
             trades = krakenService.getTrades(pair);
+            balances = krakenService.getBalances();
+            usdBalances = krakenService.getBalancesInUSD();
             running = false;
         } catch (Exception e) {
             e.printStackTrace();

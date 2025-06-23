@@ -217,32 +217,39 @@
         function setButtonsDisabled(selector, disabled) {
           document.querySelectorAll(selector).forEach(btn => btn.disabled = disabled);
         }
+        // Fetches and updates status, cycle counter, and summary header
         async function updateStatus() {
           try {
-            const resp = await fetch('/api/status');
-            const text = await resp.text();
+            // Fetch cycle counter, status, and summary in parallel for efficiency
+            const [cycleResp, statusResp, summaryResp] = await Promise.all([
+              fetch('/api/cycleCounter'),
+              fetch('/api/status'),
+              fetch('/api/summary/header')
+            ]);
+            const [cycleText, statusTextRaw, summaryData] = await Promise.all([
+              cycleResp.text(),
+              statusResp.text(),
+              summaryResp.json()
+            ]);
+
+            // Update cycle counter
+            document.getElementById('cycle-counter').textContent = `Cycle: ${cycleText.trim()}`;
+
+            // Update summary
+            const summaryDiv = document.getElementById("zz-summary");
+            summaryDiv.innerHTML = `
+              <span><b>Target</b>: Buy &lt; ${summaryData.targetBuy} (${summaryData.buyConfidence})</span>
+              <span>Sell &gt; ${summaryData.targetSell} (${summaryData.sellConfidence})</span>
+              <span>Now: ${summaryData.currentPrice}</span>
+              | <span><b>Input</b>: ${summaryData.base}/${summaryData.counter}</span>
+              | <span>${summaryData.interval} | ${summaryData.leftBars}==${summaryData.rightBars} | </span>
+              <span>${summaryData.percentChange}% | ${summaryData.daysBack}</span>`;
+
+            // Update status indicator
             const statusText = document.getElementById('status-text');
             const statusDot = document.getElementById('status-dot');
-            const status = text.trim().toLowerCase();
+            const status = statusTextRaw.trim().toLowerCase();
 
-            const resp2 = await fetch('/api/cycleCounter');
-            const text2 = await resp2.text();
-            document.getElementById('cycle-counter').textContent = `Cycle: ${text2.trim()}`;
-			
-			const resp3 = await fetch('/api/summary/header');
-            const summaryDiv = document.getElementById("zz-summary");
-			
-			const summaryData = await resp3.json();
-			summaryDiv.innerHTML = `
-        <span><b>Target</b>: Buy &lt; ${summaryData.targetBuy} (${summaryData.buyConfidence})</span>
-        <span>Sell &gt; ${summaryData.targetSell} (${summaryData.sellConfidence})</span>
-        <span>Now: ${summaryData.currentPrice}</span>
-
-    
-        | <span><b>Input</b>: ${summaryData.base}/${summaryData.counter}</span>
-        | <span>${summaryData.interval} | ${summaryData.leftBars}==${summaryData.rightBars} | </span>
-        <span>${summaryData.percentChange}% | ${summaryData.daysBack}</span>
-      `;
             // Enable all buttons by default
             setButtonsDisabled('.buttons-grid > button', false);
 
@@ -253,45 +260,39 @@
               statusDot.style.borderTop = '5px solid #28a745';
               statusDot.style.animation = 'spin 0.8s linear infinite';
               statusText.style.color = '#28a745';
-              // Disable all except Stop
               setButtonsDisabled('.buttons-grid > button', true);
               setButtonsDisabled('.buttons-grid > .stop', false);
             } else if (status === 'scheduled') {
-              statusText.textContent = 'Status: Scheduled';
-                statusDot.style.background = '#007bff';
-                statusDot.style.border = '3px solid #b8daff';
-                statusDot.style.animation = 'pulse 2s infinite alternate';
-
-                // Add pulsating keyframes if not present
-                if (!document.getElementById('pulse-keyframes')) {
-                const style = document.createElement('style');
-                style.id = 'pulse-keyframes';
-                style.innerHTML = `
-                  @keyframes pulse {
-                  0% { box-shadow: 0 0 0 0 rgba(0,123,255,0.7); }
-                  100% { box-shadow: 0 0 0 10px rgba(0,123,255,0); }
-                  }
-                `;
-                document.head.appendChild(style);
-                }
+	              statusText.textContent = 'Status: Scheduled';
+	              statusDot.style.background = '#007bff';
+	              statusDot.style.border = '3px solid #b8daff';
+	              statusDot.style.animation = 'pulse 2s infinite alternate';
+	              if (!document.getElementById('pulse-keyframes')) {
+			          const style = document.createElement('style');
+			          style.id = 'pulse-keyframes';
+			          style.innerHTML = `
+			            @keyframes pulse {
+			              0% { box-shadow: 0 0 0 0 rgba(0,123,255,0.7); }
+			              100% { box-shadow: 0 0 0 10px rgba(0,123,255,0); }
+			            }
+			          `;
+          			document.head.appendChild(style);
+              	}
               statusText.style.color = '#007bff';
-              // Disable only Start
               setButtonsDisabled('.buttons-grid > .start', true);
             } else if (status === 'stopped') {
               statusText.textContent = 'Status: Stopped';
-			  statusDot.style.background = '#dc3545';
-			  statusDot.style.border = '3px solid #dc3545';
-			 statusDot.style.animation = 'none';
+              statusDot.style.background = '#dc3545';
+              statusDot.style.border = '3px solid #dc3545';
+              statusDot.style.animation = 'none';
               statusText.style.color = '#dc3545';
-              // Disable only Stop
               setButtonsDisabled('.buttons-grid > .stop', true);
             } else {
               statusText.textContent = 'Status: Unknown';
               statusDot.style.background = '#bbb';
               statusText.style.color = '#888';
-			  statusDot.style.animation = 'none';
-			  statusDot.style.border = '3px solid #888';
-			  statusDot.style.animation = 'none';
+              statusDot.style.border = '3px solid #888';
+              statusDot.style.animation = 'none';
             }
           } catch {
             const statusText = document.getElementById('status-text');
@@ -301,6 +302,8 @@
             statusText.style.color = '#ffc107';
           }
         }
+			
+
         updateStatus();
         setInterval(updateStatus, 5000);
       </script>
@@ -333,16 +336,38 @@
           <input type="number" id="rightBars" value="5" min="1" style="width: 100%;" />
         </div>
       </div>
+ 
+      <!-- Add Font Awesome CDN in <head> if not already present -->
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 
-      <div class="buttons buttons-grid">
-        <button type="button" class="start" onclick="submitStartRequest()">Start</button>
-        <button type="button" class="predict" onclick="submitShowPredictionRequest()">Prediction</button>
-        <button type="button" class="all" onclick="submitZigZagRequest('all', 'Fetching Full ZigZag Data...')">All Data</button>
-        <button type="button" class="zz" onclick="submitZigZagRequest('zz', 'Loading ZigZag Points Only...')">ZigZags</button>
-        <button type="button" class="trades" onclick="submitPairRequest('trades/pair', 'Getting Trades. May Take Some Time...')">Trades</button>
-        <button type="button" class="orders" onclick="submitPairRequest('orders/pair', 'Fetching Orders...')">Orders</button>
-        <button type="button" class="balance" onclick="submitBaseRequest('balance/base', 'Loading Balance...')">Balance</button>
-        <button type="button" class="stop" onclick="submitStopRequest()">Stop</button>
+      <div class="buttons" style="flex-wrap: nowrap; gap: 12px; flex-direction: row; display: flex;">
+        <button type="button" class="start" onclick="submitStartRequest()" title="Start ZigZag">
+          <i class="fa-solid fa-play"></i>
+        </button>
+        <button type="button" class="predict" onclick="submitShowPredictionRequest()" title="Show Prediction">
+          <i class="fa-p"></i>
+        </button>
+        <button type="button" class="all" onclick="submitZigZagRequest('all', 'Fetching Full ZigZag Data...')" title="Show All Data">
+          <i class="fa-solid fa-chart-column"></i>
+        </button>
+        <button type="button" class="zz" onclick="submitZigZagRequest('zz', 'Loading ZigZag Points Only...')" title="Show ZigZag Points">
+          <i class="fa-solid fa-star"></i>
+        </button>
+        <button type="button" class="trades" onclick="submitPairRequest('trades/pair', 'Getting Trades. May Take Some Time...')" title="Show Trades">
+          <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+        <button type="button" class="orders" onclick="submitPairRequest('orders/pair', 'Fetching Orders...')" title="Show Orders">
+          <i class="fa-solid fa-list"></i>
+        </button>
+        <button type="button" class="balance" onclick="submitRequest('balance/all', 'Loading Balance...')" title="Show Balance">
+          <i class="fa-solid fa-coins"></i>
+        </button>
+        <button type="button" class="balance" onclick="submitRequest('usdbalance/all', 'Loading USD Balance...')" title="Show USD Balance">
+          <i class="fa-solid fa-dollar-sign"></i>
+        </button>
+        <button type="button" class="stop" onclick="submitStopRequest()" title="Stop ZigZag">
+          <i class="fa-solid fa-stop"></i>
+        </button>
       </div>
     </form>
 
@@ -511,13 +536,82 @@
         if (!response.ok) throw new Error("Request failed");
         const data = await response.json();
         resultDiv.innerText = JSON.stringify(data, null, 2);
-
-        if (endpoint === "all") drawChart(data);
+       	
       } catch (error) {
         resultDiv.innerText = `❌ Error: ${error.message}`;
       } finally {
         spinner.style.display = "none";
       }
+    }
+	
+	async function submitRequest(endpoint, loadingText) {
+	   
+	      const url = `/api/${endpoint}`;
+
+	      const spinner = document.getElementById("spinner");
+	      const resultDiv = document.getElementById("result");
+	      resultDiv.innerText = "";
+	      spinner.textContent = loadingText;
+	      spinner.style.display = "block";
+
+	      try {
+	        const response = await fetch(url);
+	        if (!response.ok) throw new Error("Request failed");
+	        const data = await response.json();
+	        resultDiv.innerText = JSON.stringify(data, null, 2);
+			//alert(endpoint+" "+data.length);
+			 if (endpoint === "balance/all") {
+				//drawPie(data);
+	       	} else if (endpoint === "usdbalance/all") {
+				drawPie(data);
+			}
+	      } catch (error) {
+	        resultDiv.innerText = `❌ Error: ${error.message}`;
+	      } finally {
+	        spinner.style.display = "none";
+	      }
+	    }
+
+
+    function drawPie(data) {
+      const ctx = document.getElementById("chart").getContext("2d");
+      // Add border to chart container
+      //document.getElementById("chart-container").style.border = "2px solid #343a40";
+      if (zigzagChart && typeof zigzagChart.destroy === 'function') {
+      zigzagChart.destroy();
+      }
+      // Convert Map<String, BigDecimal> to arrays
+      const labels = Object.keys(data);
+      const values = labels.map(k => Number(data[k]));
+      const backgroundColors = [
+      '#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#17a2b8', '#fd7e14', '#20c997', '#6610f2', '#e83e8c'
+      ];
+      zigzagChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: labels,
+        datasets: [{
+        data: values,
+        backgroundColor: labels.map((_, i) => backgroundColors[i % backgroundColors.length]),
+        borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+          label: function(ctx) {
+            const label = ctx.label || '';
+            const value = ctx.parsed || 0;
+            return `${label}: ${value}`;
+          }
+          }
+        }
+        }
+      }
+      });
     }
 
     function drawChart(data) {

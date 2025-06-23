@@ -7,13 +7,13 @@ public class ZZSummary {
     public double buyConfidence;
     public double sellConfidence;
     public double currentPrice;
-    public String base;
-    public String counter;
-    public Integer interval;
-    public Integer leftBars;
-    public Integer rightBars;
-    public Integer percentChange;
-    public Integer daysBack; 
+    public String base="";
+    public String counter="";
+    public Integer interval =0;
+    public Integer leftBars=0;
+    public Integer rightBars=0;
+    public Integer percentChange=0;
+    public Integer daysBack=0;
     
     public void setFrom(ZZTradePrediction tp, double currentPrice) {
     	targetBuy = tp.buyPrice;
