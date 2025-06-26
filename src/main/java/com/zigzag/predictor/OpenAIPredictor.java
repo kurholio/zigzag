@@ -29,11 +29,11 @@ public class OpenAIPredictor {
         String inputJson = mapper.writeValueAsString(enrichedPoints);
 
         String prompt = "Based on the provided enriched ZZPoint data, "
-        		+ "suggest the next BUY and SELL price targets along with confidence levels (0-1). Also repeat this original prompt "
-        		+ " and return JSON like this: {\"buyPrice\":..., \"sellPrice\":..., \"buyConfidence\":..., \"sellConfidence\":..., \"rationale\":..., \"prompt\"...}";
+        		+ "suggest the next BUY and SELL price targets along with confidence levels (0-1). "
+        		+ "Return JSON like this: {\"buyPrice\":..., \"sellPrice\":..., \"buyConfidence\":..., \"sellConfidence\":..., \"rationale\":...}";
 
         Map<String, Object> request = Map.of(
-                "model", "gpt-4.1",
+                "model", "gpt-4.1-nano",
                 "messages", List.of(
                         Map.of("role", "system", "content", "You are a financial trading assistant."),
                         Map.of("role", "user", "content", prompt + "\n\n" + inputJson)

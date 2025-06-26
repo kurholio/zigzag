@@ -170,8 +170,8 @@ public class ZZController {
           return ResponseEntity.ok(allbars); // ✅ Automatically serialized as JSON
     }
     
-    @GetMapping("/start")
-    public ResponseEntity<String> start(
+    @GetMapping("/startbot")
+    public ResponseEntity<String> startBot(
     		@RequestParam(defaultValue = "BTC") String base,
             @RequestParam(defaultValue = "USD") String counter,
             @RequestParam(defaultValue = "60") Integer interval,
@@ -226,12 +226,12 @@ public class ZZController {
                 BigDecimal currentPrice = krakenService.getLatestPrice(pair);
                 if (prediction.isBuyNow(currentPrice)) {
                     krakenService.placeBuyLimitOrderWithStopLoss(pair, new BigDecimal(getTradeAmount()), 
-                            new BigDecimal(currentPrice.doubleValue()), true);
+                            new BigDecimal(currentPrice.doubleValue()*0.975), true);
 
                 }
                 if (prediction.isSellNow(currentPrice)) {
                     krakenService.placeSellLimitOrderWithStopCancel(pair, new BigDecimal(getTradeAmount()), 
-                            new BigDecimal(currentPrice.doubleValue()), true);
+                            new BigDecimal(currentPrice.doubleValue()*1.025), true);
                 }
             }
             

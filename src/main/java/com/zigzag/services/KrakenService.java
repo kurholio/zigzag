@@ -267,7 +267,7 @@ public class KrakenService {
             */
 
             return limitOrderId;
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
@@ -301,7 +301,7 @@ public class KrakenService {
             }
 
             return limitOrderId;
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
@@ -317,10 +317,12 @@ public class KrakenService {
         	}
         	
         	
-			if (wsClient == null || wsClient.isClosed() || wsClient.isClosing() || wsClient.isFlushAndClose()) {
-				wsClient.close();
-				latestPrices.clear();
-			}
+        	if (wsClient != null) {
+				if ( wsClient.isClosed() || wsClient.isClosing() || wsClient.isFlushAndClose()) {
+					wsClient.close();
+					latestPrices.clear();
+				}
+        	}
 
 			
 

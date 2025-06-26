@@ -395,8 +395,11 @@
       const percentChange = document.getElementById("percentChange").value;
       const daysBack = document.getElementById("daysBack").value;
 
-      const url = `/api/start?base=${base}&counter=${counter}&interval=${interval}&leftBars=${leftBars}&rightBars=${rightBars}&percentChange=${percentChange}&daysBack=${daysBack}`;
+	  
+	 // alert(base+counter+interval+leftBars+rightBars+percentChange+daysBack);
+      const url = `/api/startbot?base=${base}&counter=${counter}&interval=${interval}&leftBars=${leftBars}&rightBars=${rightBars}&percentChange=${percentChange}&daysBack=${daysBack}`;
 
+	  alert(url);
       const spinner = document.getElementById("spinner");
       const resultDiv = document.getElementById("result");
       resultDiv.innerText = "";
