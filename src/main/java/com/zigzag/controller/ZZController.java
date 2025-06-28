@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 
+import org.knowm.xchange.dto.Order.OrderType;
 import org.knowm.xchange.dto.marketdata.Trade;
 import org.knowm.xchange.kraken.dto.trade.KrakenOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -219,30 +220,108 @@ public class ZZController {
             balance = krakenService.getBalance(base).doubleValue();
             allbars = ZZCalculator.generateFeatureEnrichedZZPoints(bars, zigzag,false);
             prediction =  OpenAIPredictor.getPredictionFromGPT(zigzag);
-            System.out.println("ZigZag Pivot Points:");
-            zigzag.forEach(System.out::println);
-
-            if (krakenService.latestPrices.size() > 0) {
-                BigDecimal currentPrice = krakenService.getLatestPrice(pair);
-                if (prediction.isBuyNow(currentPrice)) {
-                    krakenService.placeBuyLimitOrderWithStopLoss(pair, new BigDecimal(getTradeAmount()), 
-                            new BigDecimal(currentPrice.doubleValue()*0.975), true);
-
-                }
-                if (prediction.isSellNow(currentPrice)) {
-                    krakenService.placeSellLimitOrderWithStopCancel(pair, new BigDecimal(getTradeAmount()), 
-                            new BigDecimal(currentPrice.doubleValue()*1.025), true);
-                }
-            }
+            //System.out.println("ZigZag Pivot Points:");
+            tryTrades(pair);
             
             Thread.sleep(2000);
             orders = krakenService.getOrders(pair);
             trades = krakenService.getTrades(pair);
             balances = krakenService.getBalances();
             usdBalances = krakenService.getBalancesInUSD();
+            updateZZPointsWithTradesAndOrders();
             running = false;
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+	private void tryTrades(String pair) {
+		//zigzag.forEach(System.out::println);
+
+		if (krakenService.latestPrices.size() > 0) {
+		    BigDecimal currentPrice = krakenService.getLatestPrice(pair);
+		    if (prediction.isBuyNow(currentPrice)) {
+		        krakenService.placeBuyLimitOrderWithStopLoss(pair, new BigDecimal(getTradeAmount()), 
+		                new BigDecimal(currentPrice.doubleValue()*0.975), true);
+
+		    }
+		    if (prediction.isSellNow(currentPrice)) {
+		        krakenService.placeSellLimitOrderWithStopCancel(pair, new BigDecimal(getTradeAmount()), 
+		                new BigDecimal(currentPrice.doubleValue()*1.025), true);
+		    }
+		}
+	}
+    
+    public ZZPoint getClosestZZPoint(Trade trade) {
+        if (allbars == null || allbars.isEmpty() || trade == null || trade.getTimestamp() == null) {
+            return null;
+        }
+        ZZPoint closest = null;
+        long minDiff = Long.MAX_VALUE;
+        long tradeTime = trade.getTimestamp().getTime();
+        for (ZZPoint point : allbars) {
+            long pointTime = point.getDate().getTime();
+            if (tradeTime >= pointTime) {
+                long diff = tradeTime - pointTime;
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = point;
+                }
+                // Prefer exact match
+                if (pointTime == tradeTime) {
+                    return point;
+                }
+            }
+        }
+        return closest;
+    }
+    
+    public ZZPoint getClosestZZPoint(KrakenOrder order) {
+        if (allbars == null || allbars.isEmpty() || order == null || order.getOpenTimestamp() == 0) {
+            return null;
+        }
+        ZZPoint closest = null;
+        long minDiff = Long.MAX_VALUE;
+        long orderTime = (long) order.getOpenTimestamp();
+        for (ZZPoint point : allbars) {
+            long pointTime = point.getDate().getTime();
+            long diff = Math.abs(pointTime - orderTime);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = point;
+            }
+            // Prefer exact match
+            if (pointTime == orderTime) {
+                return point;
+            }
+        }
+        return closest;
+    }
+    
+    public void updateZZPointsWithTradesAndOrders() {
+        // For each trade, find the closest ZZPoint by date and attach trade info
+        if (allbars == null || allbars.isEmpty()) return;
+        if (trades != null) {
+            for (Trade trade : trades) {
+                ZZPoint closest = getClosestZZPoint(trade);
+                if (closest != null) { 
+                	closest.setTrade(trade); // You need to add setTrade(Trade) to ZZPoint
+                	closest.saleTrade = trade.getType() == OrderType.ASK;
+                	closest.buyTrade = trade.getType() == OrderType.BID;
+                } else {
+                	System.out.println("Trade note found: "+trade.getTimestamp());
+                }
+            }
+        }
+        // For each order, find the closest ZZPoint by date and attach order info
+        if (orders != null) {
+            for (KrakenOrder order : orders) {
+                ZZPoint closest = getClosestZZPoint(order);
+                
+                if (closest != null) {
+                    closest.setOrder(order); // You need to add setOrder(KrakenOrder) to ZZPoint
+                }
+            }
         }
     }
 
@@ -259,7 +338,7 @@ public class ZZController {
         scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
         scheduler.scheduleAtFixedRate(
             () -> run(base, counter, interval, leftBars, rightBars, percentChange, daysBack),
-            0, 2, java.util.concurrent.TimeUnit.MINUTES
+            0, 30, java.util.concurrent.TimeUnit.MINUTES
         );
     }
 

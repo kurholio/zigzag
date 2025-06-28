@@ -399,7 +399,7 @@
 	 // alert(base+counter+interval+leftBars+rightBars+percentChange+daysBack);
       const url = `/api/startbot?base=${base}&counter=${counter}&interval=${interval}&leftBars=${leftBars}&rightBars=${rightBars}&percentChange=${percentChange}&daysBack=${daysBack}`;
 
-	  alert(url);
+	  //alert(url);
       const spinner = document.getElementById("spinner");
       const resultDiv = document.getElementById("result");
       resultDiv.innerText = "";
@@ -632,6 +632,23 @@
           ...d
         }));
 
+    const buyTrades = data
+       .filter(d => d.buyTrade === true)
+      .map(d => ({
+        x: new Date(d.timestamp),
+        y: d.close,
+        ...d
+      }));
+	  
+	 //alert(buyTrades)  ;
+	  
+    const saleTrades = data
+      .filter(d => d.saleTrade === true)
+      .map(d => ({
+        x: new Date(d.timestamp),
+        y: d.close,
+        ...d
+      }));
       if (zigzagChart && typeof zigzagChart.destroy === 'function') {
         zigzagChart.destroy();
       }
@@ -660,6 +677,30 @@
               borderColor: '#000',
               borderWidth: 2,
               pointStyle: 'circle',
+              yAxisID: 'y1'
+            },
+            {
+              type: 'scatter',
+              label: 'Buy Trade',
+              data: buyTrades,
+              pointRadius: 12,
+              backgroundColor: 'green',
+              borderColor: '#000',
+              borderWidth: 2,
+              pointStyle: 'triangle',
+              rotation: 360,
+              yAxisID: 'y1'
+            },
+            {
+              type: 'scatter',
+              label: 'Sale Trade',
+              data: saleTrades,
+              pointRadius: 12,
+              backgroundColor: 'red',
+              borderColor: '#000',
+              pointStyle: 'triangle',
+              rotation: 180,
+              borderWidth: 2,
               yAxisID: 'y1'
             },
             {

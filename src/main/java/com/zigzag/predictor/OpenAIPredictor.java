@@ -16,9 +16,9 @@ import com.zigzag.data.ZZTradePrediction;
 
 public class OpenAIPredictor {
 	  private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-	  private static final String OPENAI_AK1 = "sk-proj-yNnRTUbSQcJWHNiS5XqndFP1wufefth8MOske_9cxKIYA5CCtU79Ei52P";
-	  private static final String OPENAI_AK2 = "_Rfk8Uc_lHKvNFxbVT3BlbkFJfgWshgAOuMefWPlYsGygz_igd3vWG"		  ;
-	  private static final String OPENAI_AK3 = "_juegjCwNWlRlwHsAkRv5z9qYaMddbNP-V4vB9jjur2oA"		  ;
+	  private static final String OPENAI_AK1 = "sk-proj--wFaDcCzpwKomYop_I7NjCEtxeeqUPKzreHL";
+	  private static final String OPENAI_AK2 = "-i5fQ0g4HByFwdBTBDVu1R9lKYeWgI6mU_5p2wT3BlbkFJshIC1UphTckZmzyC";
+	  private static final String OPENAI_AK3 = "_3IEwwgoNgENu27nBfu5lIp-NUlTbzcLOyZs5Th0fIyEO_E4lD1MZJCMUA";
 	
 	  
 	  //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
@@ -26,6 +26,10 @@ public class OpenAIPredictor {
 
 	
 	public static ZZTradePrediction getPredictionFromGPT(List<ZZPoint> enrichedPoints) throws IOException, InterruptedException {
+		
+		if (enrichedPoints.size() == 0 ) {
+			return new ZZTradePrediction();
+		}
         String inputJson = mapper.writeValueAsString(enrichedPoints);
 
         String prompt = "Based on the provided enriched ZZPoint data, "
