@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ZigZag Predictor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.3/build/global/luxon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f8f9fa;
+      padding: 20px;
+      margin: 0;
+    }
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+    .container {
+      max-width: 90%;
+      margin: auto;
+      background: #fff;
+      padding: 30px 40px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .form-group {
+      display: flex;
+      margin-bottom: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .form-group label {
+      flex: 1 0 100%;
+      font-weight: 500;
+      color: #444;
+      margin-bottom: 5px;
+    }
+    .form-group input,
+    .form-group select {
+      flex: 1 0 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .buttons button {
+      padding: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .buttons button.start { background-color: #28a745; }
+    .buttons button.start:hover { background-color: #1e7e34; }
+    .buttons button.stop { background-color: #dc3545; }
+    .buttons button.stop:hover { background-color: #a71d2a; }
+    .buttons button.predict { background-color: #ced4da; color: #2c2f33; }
+    .buttons button.predict:hover { background-color: #495057; color: #ccc }
+    .buttons button.all { background-color: #aaa; }
+    .buttons button.all:hover { background-color: #384344; }
+    .buttons button.zz { background-color: #adb5bd; }
+    .buttons button.zz:hover { background-color: #6c757d; }
+    .buttons button.trades { background-color: #ced4da; color: #2c2f33; }
+    .buttons button.trades:hover { background-color: #adb5bd; }
+    .buttons button.orders { background-color: #dee2e6; color: #212529; }
+    .buttons button.orders:hover { background-color: #adb5bd; }
+    .buttons button.balance { background-color: #e9ecef; color: #212529; }
+    .buttons button.balance:hover { background-color: #adb5bd; }
+    .spinner {
+      display: none;
+      margin-top: 15px;
+      font-style: italic;
+      color: #555;
+    }
+    .spinner:before {
+      content: "";
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 3px solid #ccc;
+      border-top: 3px solid #007bff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    pre {
+      background: #f0f0f0;
+      padding: 15px;
+      border-radius: 5px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 14px;
+      height: 250px;
+      max-height: 250px;
+    }
+    #chart-container {
+      margin-top: 30px;
+      height: 500px;
+      position: relative;
+      background: #f0f0f0;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .export-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+    .export-buttons button {
+      background-color: #343a40;
+      color: white;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .buttons-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    @media (max-width: 700px) {
+      .buttons-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 500px) {
+      .buttons-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .buttons-grid button {
+      width: 100%;
+    }
+    @media (min-width: 600px) {
+      .form-group {
+        flex-direction: row;
+      }
+      .form-group label, .form-group input, .form-group select {
+        flex: 1;
+      }
+    }
+    .form-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .form-row .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .form-row .form-group label {
+      white-space: nowrap;
+      margin-bottom: 5px;
+    }
+    @media (max-width: 900px) {
+      .form-row {
+        flex-direction: column;
+        gap: 0;
+      }
+      .form-row .form-group {
+        min-width: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <form onsubmit="event.preventDefault();">
+      <div style="display: flex; align-items: center; margin-bottom: 10px; justify-content: space-between;">
+        <span id="status-indicator" style="display: inline-flex; align-items: center; font-weight: bold; color: #888; font-size: 12px;">
+          <span id="status-dot" style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#bbb; margin-right:8px;"></span>
+          <span id="status-text">Status: ...</span>
+        </span>
+        <span id="cycle-counter" style="font-weight: bold; color: #007bff; font-size: 12px;">Cycle: ...</span>
+      </div>
+	  <div id="zz-summary" style="text-align: right; margin-bottom: 20px; font-size: 10px; color: #aaa;">
+	    Loading summary...
+	  </div>
+      <div class="form-group">
+        <h1>
+          <label>ZigZag&nbsp;&nbsp;</label>
+          <span id="pair-display"></span>
+        </h1>
+      </div>
+      <script>
+        // Helper to get query param from URL
+        function getQueryParam(name) {
+          const url = new URL(window.location.href);
+          return url.searchParams.get(name) || '';
+        }
+        // Set pair display on page load
+        document.addEventListener('DOMContentLoaded', function() {
+          const base = getQueryParam('base');
+          const counter = getQueryParam('counter');
+          document.getElementById('pair-display').textContent = base && counter ? `${base}/${counter}` : '';
+          // Set hidden fields for JS to use
+          window.pairBase = base;
+          window.pairCounter = counter;
+        });
+      </script>
+      <!-- Hidden fields for JS compatibility -->
+      <input type="hidden" id="base" value="">
+      <input type="hidden" id="counter" value="">
+      <script>
+        // Set hidden input values for compatibility with existing JS
+        document.addEventListener('DOMContentLoaded', function() {
+          document.getElementById('base').value = window.pairBase || '';
+          document.getElementById('counter').value = window.pairCounter || '';
+        });
+      </script>
+
+      <script>
+        // Helper to enable/disable buttons by class
+        function setButtonsDisabled(selector, disabled) {
+          document.querySelectorAll(selector).forEach(btn => btn.disabled = disabled);
+        }
+        // Fetches and updates status, cycle counter, and summary header
+        async function updateStatus() {
+          try {
+            // Fetch cycle counter, status, and summary in parallel for efficiency
+            const [cycleResp, statusResp, summaryResp] = await Promise.all([
+              fetch('/api/cycleCounter'),
+              fetch('/api/status'),
+              fetch('/api/summary/header')
+            ]);
+            const [cycleText, statusTextRaw, summaryData] = await Promise.all([
+              cycleResp.text(),
+              statusResp.text(),
+              summaryResp.json()
+            ]);
+
+            // Update cycle counter
+            document.getElementById('cycle-counter').textContent = `Cycle: ${cycleText.trim()}`;
+
+            // Update summary
+            const summaryDiv = document.getElementById("zz-summary");
+            summaryDiv.innerHTML = `
+              <span><b>Target</b>: Buy &lt; ${summaryData.targetBuy} (${summaryData.buyConfidence})</span>
+              <span>Sell &gt; ${summaryData.targetSell} (${summaryData.sellConfidence})</span>
+              <span>Now: ${summaryData.currentPrice}</span>
+              | <span><b>Input</b>: ${summaryData.base}/${summaryData.counter}</span>
+              | <span>${summaryData.interval} | ${summaryData.leftBars}==${summaryData.rightBars} | </span>
+              <span>${summaryData.percentChange}% | ${summaryData.daysBack}</span>`;
+
+            // Update status indicator
+            const statusText = document.getElementById('status-text');
+            const statusDot = document.getElementById('status-dot');
+            const status = statusTextRaw.trim().toLowerCase();
+
+            // Enable all buttons by default
+            setButtonsDisabled('.buttons-grid > button', false);
+
+            if (status === 'running') {
+              statusText.textContent = 'Status: Running';
+              statusDot.style.background = '#28a745';
+              statusDot.style.border = '6px solid #c3e6cb';
+              statusDot.style.borderTop = '5px solid #28a745';
+              statusDot.style.animation = 'spin 0.8s linear infinite';
+              statusText.style.color = '#28a745';
+              setButtonsDisabled('.buttons-grid > button', true);
+              setButtonsDisabled('.buttons-grid > .stop', false);
+            } else if (status === 'scheduled') {
+	              statusText.textContent = 'Status: Scheduled';
+	              statusDot.style.background = '#007bff';
+	              statusDot.style.border = '3px solid #b8daff';
+	              statusDot.style.animation = 'pulse 2s infinite alternate';
+	              if (!document.getElementById('pulse-keyframes')) {
+			          const style = document.createElement('style');
+			          style.id = 'pulse-keyframes';
+			          style.innerHTML = `
+			            @keyframes pulse {
+			              0% { box-shadow: 0 0 0 0 rgba(0,123,255,0.7); }
+			              100% { box-shadow: 0 0 0 10px rgba(0,123,255,0); }
+			            }
+			          `;
+          			document.head.appendChild(style);
+              	}
+              statusText.style.color = '#007bff';
+              setButtonsDisabled('.buttons-grid > .start', true);
+            } else if (status === 'stopped') {
+              statusText.textContent = 'Status: Stopped';
+              statusDot.style.background = '#dc3545';
+              statusDot.style.border = '3px solid #dc3545';
+              statusDot.style.animation = 'none';
+              statusText.style.color = '#dc3545';
+              setButtonsDisabled('.buttons-grid > .stop', true);
+            } else {
+              statusText.textContent = 'Status: Unknown';
+              statusDot.style.background = '#bbb';
+              statusText.style.color = '#888';
+              statusDot.style.border = '3px solid #888';
+              statusDot.style.animation = 'none';
+            }
+          } catch {
+            const statusText = document.getElementById('status-text');
+            const statusDot = document.getElementById('status-dot');
+            statusText.textContent = 'Status: Error';
+            statusDot.style.background = '#ffc107';
+            statusText.style.color = '#ffc107';
+          }
+        }
+			
+
+        updateStatus();
+        setInterval(updateStatus, 5000);
+      </script>
+
+      <div class="form-row" style="display: flex; gap: 24px; justify-content: space-between; width: 100%;">
+        <div class="form-group" style="flex:1; min-width: 160px; flex-direction: column; align-items: flex-start;">
+          <label for="interval" style="white-space: nowrap; text-align: left; align-self: flex-start;">Interval</label>
+          <select id="interval" style="width: 100%;">
+            <option value="1">1 min</option>
+            <option value="5">5 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60" selected>60 min</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1; min-width: 120px; flex-direction: column; align-items: flex-start;">
+          <label for="percentChange" style="white-space: nowrap; text-align: left; align-self: flex-start;">Threshold (%)</label>
+          <input type="number" id="percentChange" value="3" min="1" style="width: 100%;" />
+        </div>
+        <div class="form-group" style="flex:1; min-width: 120px; flex-direction: column; align-items: flex-start;">
+          <label for="percentChange" style="white-space: nowrap; text-align: left; align-self: flex-start;">Days Back</label>
+          <input type="number" id="daysBack" value="10" min="1" style="width: 100%;" />
+        </div>
+        <div class="form-group" style="flex:1; min-width: 120px; flex-direction: column; align-items: flex-start;">
+          <label for="leftBars" style="white-space: nowrap; text-align: left; align-self: flex-start;">Left Bars</label>
+          <input type="number" id="leftBars" value="5" min="1" style="width: 100%;" />
+        </div>
+        <div class="form-group" style="flex:1; min-width: 120px; flex-direction: column; align-items: flex-start;">
+          <label for="rightBars" style="white-space: nowrap; text-align: left; align-self: flex-start;">Right Bars</label>
+          <input type="number" id="rightBars" value="5" min="1" style="width: 100%;" />
+        </div>
+      </div>
+ 
+      <!-- Add Font Awesome CDN in <head> if not already present -->
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+      <div class="buttons" style="flex-wrap: nowrap; gap: 12px; flex-direction: row; display: flex;">
+        <button type="button" class="start" onclick="submitStartRequest()" title="Start ZigZag">
+          <i class="fa-solid fa-play"></i>
+        </button>
+        <button type="button" class="predict" onclick="submitShowPredictionRequest()" title="Show Prediction">
+          <i class="fa-p"></i>
+        </button>
+        <button type="button" class="all" onclick="submitZigZagRequest('all', 'Fetching Full ZigZag Data...')" title="Show All Data">
+          <i class="fa-solid fa-chart-column"></i>
+        </button>
+        <button type="button" class="zz" onclick="submitZigZagRequest('zz', 'Loading ZigZag Points Only...')" title="Show ZigZag Points">
+          <i class="fa-solid fa-star"></i>
+        </button>
+        <button type="button" class="trades" onclick="submitPairRequest('trades/pair', 'Getting Trades. May Take Some Time...')" title="Show Trades">
+          <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+        <button type="button" class="orders" onclick="submitPairRequest('orders/pair', 'Fetching Orders...')" title="Show Orders">
+          <i class="fa-solid fa-list"></i>
+        </button>
+        <button type="button" class="balance" onclick="submitRequest('balance/all', 'Loading Balance...')" title="Show Balance">
+          <i class="fa-solid fa-coins"></i>
+        </button>
+        <button type="button" class="balance" onclick="submitRequest('usdbalance/all', 'Loading USD Balance...')" title="Show USD Balance">
+          <i class="fa-solid fa-dollar-sign"></i>
+        </button>
+        <button type="button" class="stop" onclick="submitStopRequest()" title="Stop ZigZag">
+          <i class="fa-solid fa-stop"></i>
+        </button>
+      </div>
+    </form>
+
+    <div class="spinner" id="spinner">Loading...</div>
+    <h3>Result:</h3>
+    <pre id="result"></pre>
+    <div id="chart-container">
+      <canvas id="chart"></canvas>
+    </div>
+    <div class="export-buttons">
+      <button onclick="downloadChart()">Download Chart</button>
+      <button onclick="exportData()">Export Data</button>
+    </div>
+  </div>
+
+  <script>
+    let zigzagChart;
+
+    async function submitStartRequest() {
+      const base = document.getElementById("base").value.trim();
+      const counter = document.getElementById("counter").value.trim();
+      const interval = document.getElementById("interval").value;
+      const leftBars = document.getElementById("leftBars").value;
+      const rightBars = document.getElementById("rightBars").value;
+      const percentChange = document.getElementById("percentChange").value;
+      const daysBack = document.getElementById("daysBack").value;
+
+	  
+	 // alert(base+counter+interval+leftBars+rightBars+percentChange+daysBack);
+      const url = `/api/startbot?base=${base}&counter=${counter}&interval=${interval}&leftBars=${leftBars}&rightBars=${rightBars}&percentChange=${percentChange}&daysBack=${daysBack}`;
+
+	  //alert(url);
+      const spinner = document.getElementById("spinner");
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerText = "";
+      spinner.textContent = "Starting";
+      spinner.style.display = "block";
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Request failed");
+        const data = await response.json();
+        resultDiv.innerText = "Started";
+        setButtonsDisabled('.buttons-grid > button', true);
+        setButtonsDisabled('.buttons-grid > .stop', false);
+      } catch (error) {
+        alert(error);
+        resultDiv.innerText = `❌ Error: ${error.message}`;
+      } finally {
+        spinner.style.display = "none";
+        spinner.textContent = "";
+      }
+    }
+
+    async function submitShowPredictionRequest() {
+      const url = `/api/prediction`;
+      const spinner = document.getElementById("spinner");
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerText = "";
+      spinner.textContent = "Predicting";
+      spinner.style.display = "block";
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Request failed");
+        const data = await response.json();
+        resultDiv.innerText = JSON.stringify(data, null, 2);
+      } catch (error) {
+        resultDiv.innerText = `❌ Error: ${error.message}`;
+      } finally {
+        spinner.style.display = "none";
+        spinner.textContent = "";
+      }
+    }
+
+    async function submitStopRequest() {
+      const url = `/api/stop`;
+      const spinner = document.getElementById("spinner");
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerText = "";
+      spinner.textContent = "Stopping";
+      spinner.style.display = "block";
+      setButtonsDisabled('.buttons-grid > button', false);
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Request failed");
+        const data = await response.json();
+        resultDiv.innerText = "Stopped";
+      } catch (error) {
+        resultDiv.innerText = `❌ Error: ${error.message}`;
+      } finally {
+        spinner.style.display = "none";
+        spinner.textContent = "";
+      }
+    }
+
+    async function submitZigZagRequest(endpoint, loadingText) {
+      const base = document.getElementById("base").value.trim();
+      const counter = document.getElementById("counter").value.trim();
+      const pair = base + counter;
+      const interval = document.getElementById("interval").value;
+      const leftBars = document.getElementById("leftBars").value;
+      const rightBars = document.getElementById("rightBars").value;
+      const percentChange = document.getElementById("percentChange").value;
+      const daysBack = document.getElementById("daysBack").value;
+
+      const url = `/api/zigzag/${endpoint}/${pair}?interval=${interval}&leftBars=${leftBars}&rightBars=${rightBars}&percentChange=${percentChange}&daysBack=${daysBack}`;
+
+      const spinner = document.getElementById("spinner");
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerText = "";
+      spinner.textContent = loadingText;
+      spinner.style.display = "block";
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Request failed");
+        const data = await response.json();
+        resultDiv.innerText = JSON.stringify(data, null, 2);
+
+        if (endpoint === "all" && data.length > 0) drawChart(data);
+      } catch (error) {
+        resultDiv.innerText = `❌ Error: ${error.message}`;
+      } finally {
+        spinner.style.display = "none";
+      }
+    }
+
+    async function submitPairRequest(endpoint, loadingText) {
+      const base = document.getElementById("base").value.trim();
+      const counter = document.getElementById("counter").value.trim();
+      const pair = base + counter;
+
+      const url = `/api/${endpoint}/${pair}?`;
+
+      const spinner = document.getElementById("spinner");
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerText = "";
+      spinner.textContent = loadingText;
+      spinner.style.display = "block";
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Request failed");
+        const data = await response.json();
+        resultDiv.innerText = JSON.stringify(data, null, 2);
+
+        if (endpoint === "all") drawChart(data);
+      } catch (error) {
+        resultDiv.innerText = `❌ Error: ${error.message}`;
+      } finally {
+        spinner.style.display = "none";
+      }
+    }
+
+    async function submitBaseRequest(endpoint, loadingText) {
+      const base = document.getElementById("base").value.trim();
+
+      const url = `/api/${endpoint}/${base}?`;
+
+      const spinner = document.getElementById("spinner");
+      const resultDiv = document.getElementById("result");
+      resultDiv.innerText = "";
+      spinner.textContent = loadingText;
+      spinner.style.display = "block";
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Request failed");
+        const data = await response.json();
+        resultDiv.innerText = JSON.stringify(data, null, 2);
+       	
+      } catch (error) {
+        resultDiv.innerText = `❌ Error: ${error.message}`;
+      } finally {
+        spinner.style.display = "none";
+      }
+    }
+	
+	async function submitRequest(endpoint, loadingText) {
+	   
+	      const url = `/api/${endpoint}`;
+
+	      const spinner = document.getElementById("spinner");
+	      const resultDiv = document.getElementById("result");
+	      resultDiv.innerText = "";
+	      spinner.textContent = loadingText;
+	      spinner.style.display = "block";
+
+	      try {
+	        const response = await fetch(url);
+	        if (!response.ok) throw new Error("Request failed");
+	        const data = await response.json();
+	        resultDiv.innerText = JSON.stringify(data, null, 2);
+			//alert(endpoint+" "+data.length);
+			 if (endpoint === "balance/all") {
+				//drawPie(data);
+	       	} else if (endpoint === "usdbalance/all") {
+				drawPie(data);
+			}
+	      } catch (error) {
+	        resultDiv.innerText = `❌ Error: ${error.message}`;
+	      } finally {
+	        spinner.style.display = "none";
+	      }
+	    }
+
+
+    function drawPie(data) {
+      const ctx = document.getElementById("chart").getContext("2d");
+      // Add border to chart container
+      //document.getElementById("chart-container").style.border = "2px solid #343a40";
+      if (zigzagChart && typeof zigzagChart.destroy === 'function') {
+      zigzagChart.destroy();
+      }
+      // Convert Map<String, BigDecimal> to arrays
+      const labels = Object.keys(data);
+      const values = labels.map(k => Number(data[k]));
+      const backgroundColors = [
+      '#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#17a2b8', '#fd7e14', '#20c997', '#6610f2', '#e83e8c'
+      ];
+      zigzagChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: labels,
+        datasets: [{
+        data: values,
+        backgroundColor: labels.map((_, i) => backgroundColors[i % backgroundColors.length]),
+        borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+          label: function(ctx) {
+            const label = ctx.label || '';
+            const value = ctx.parsed || 0;
+            return `${label}: ${value}`;
+          }
+          }
+        }
+        }
+      }
+      });
+    }
+
+    function drawChart(data) {
+      const ctx = document.getElementById("chart").getContext("2d");
+
+      const labels = data.map(d => new Date(d.timestamp));
+      const closes = data.map(d => d.close);
+      const volumes = data.map(d => d.volume);
+
+      const zigzagPoints = data
+        .filter(d => d.type === 'HIGH' || d.type === 'LOW')
+        .map(d => ({
+          x: new Date(d.timestamp),
+          y: d.close,
+          ...d
+        }));
+
+    const buyTrades = data
+       .filter(d => d.buyTrade === true)
+      .map(d => ({
+        x: new Date(d.timestamp),
+        y: d.close,
+        ...d
+      }));
+	  
+	 //alert(buyTrades)  ;
+	  
+    const saleTrades = data
+      .filter(d => d.saleTrade === true)
+      .map(d => ({
+        x: new Date(d.timestamp),
+        y: d.close,
+        ...d
+      }));
+      if (zigzagChart && typeof zigzagChart.destroy === 'function') {
+        zigzagChart.destroy();
+      }
+
+      zigzagChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              type: 'line',
+              label: 'Close',
+              data: closes,
+              borderColor: '#aaa',
+              borderWidth: 2,
+              fill: true,
+              pointRadius: 0,
+              yAxisID: 'y1'
+            },
+            {
+              type: 'scatter',
+              label: 'ZigZags',
+              data: zigzagPoints,
+              pointRadius: 16,
+              backgroundColor: ctx => ctx.raw.type === 'HIGH' ? 'green' : 'orange',
+              borderColor: '#000',
+              borderWidth: 2,
+              pointStyle: 'circle',
+              yAxisID: 'y1'
+            },
+            {
+              type: 'scatter',
+              label: 'Buy Trade',
+              data: buyTrades,
+              pointRadius: 12,
+              backgroundColor: 'green',
+              borderColor: '#000',
+              borderWidth: 2,
+              pointStyle: 'triangle',
+              rotation: 360,
+              yAxisID: 'y1'
+            },
+            {
+              type: 'scatter',
+              label: 'Sale Trade',
+              data: saleTrades,
+              pointRadius: 12,
+              backgroundColor: 'red',
+              borderColor: '#000',
+              pointStyle: 'triangle',
+              rotation: 180,
+              borderWidth: 2,
+              yAxisID: 'y1'
+            },
+            {
+              label: 'Volume',
+              data: volumes,
+              backgroundColor: '#000',
+              yAxisID: 'y'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              displayColors: false,
+              callbacks: {
+                title: function(ctx) {
+                  const d = ctx[0].raw;
+                  return d && d.type ? `ZigZag - ${d.type}` : new Date(ctx[0].parsed.x).toLocaleString();
+                },
+                label: function(ctx) {
+                  const d = ctx.raw;
+                  if (typeof d !== 'object') return `${ctx.dataset.label}: ${ctx.raw}`;
+                  return [
+                    `Time: ${new Date(d.timestamp).toLocaleString()}`,
+                    `Open: ${d.open}`,
+                    `High: ${d.high}`,
+                    `Low: ${d.low}`,
+                    `Close: ${d.close}`,
+                    `Volume: ${d.volume}`
+                  ];
+                }
+              }
+            },
+            zoom: {
+              pan: {
+                enabled: true,
+                mode: 'x',
+                modifierKey: 'ctrl',
+              },
+              zoom: {
+                wheel: { enabled: true },
+                pinch: { enabled: true },
+                mode: 'x'
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: { tooltipFormat: 'MMM dd HH:mm' },
+              ticks: { display: false }
+            },
+            y: {
+              beginAtZero: true,
+              position: 'left',
+              title: { display: true, text: 'Volume' },
+              weight: 0.2
+            },
+            y1: {
+              beginAtZero: false,
+              position: 'right',
+              title: { display: true, text: 'Price' },
+              grid: { drawOnChartArea: false }
+            }
+          }
+        }
+      });
+    }
+
+    function downloadChart() {
+      const a = document.createElement('a');
+      a.href = zigzagChart.toBase64Image();
+      a.download = 'zigzag_chart.png';
+      a.click();
+    }
+
+    function exportData() {
+      const text = document.getElementById("result").innerText;
+      const blob = new Blob([text], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'zigzag_data.json';
+      a.click();
+    }
+  </script>
+</body>
+</html>

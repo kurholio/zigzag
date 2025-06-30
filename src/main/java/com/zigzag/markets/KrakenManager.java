@@ -1,6 +1,8 @@
 package com.zigzag.markets;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -8,7 +10,12 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +27,12 @@ import okhttp3.Response;
 
 public class KrakenManager {
 	private static final int RATE_LIMIT_MS = 1000; // 1 second between requests
+	
+	
+	
+	public static Map<String, BigDecimal> latestPrices = new ConcurrentHashMap<>();
+	private static WebSocketClient wsClient;
+	
 	public static List<ZZPoint> fetchOHLC(String pair, int interval) throws IOException {
         String url = "https://api.kraken.com/0/public/OHLC?pair=" + pair + "&interval=" + interval;
 
@@ -132,6 +145,80 @@ public class KrakenManager {
         
         System.out.println("Completed! Total data points: " + bars.size());
         return bars;
+    }
+	
+	public static void connectWebSocketTicker(List<String> krakenPairs) {
+    	
+		//CurrencyPair currencyPair = CurrencyPairDeserializer.getCurrencyPairFromString(krakenPair);
+        try {
+        	
+        	
+        	
+        	if (wsClient != null) {
+				if ( wsClient.isClosed() || wsClient.isClosing() || wsClient.isFlushAndClose()) {
+					wsClient.close();
+					latestPrices.clear();
+				}
+        	}
+
+			
+
+			// Create WebSocket client for Kraken ticker
+        	String symbol = krakenPairs.toString();
+            wsClient = new WebSocketClient(new URI("wss://ws.kraken.com")) {
+                @Override
+                public void onOpen(ServerHandshake handshakedata) {
+                    System.out.println("WebSocket Opened. Subscribing...");
+                    String subscribeMessage = String.format(
+                        "{\"event\":\"subscribe\", \"pair\":[\"%s\"], \"subscription\":{\"name\":\"ticker\"}}",
+                        symbol
+                    );
+                    send(subscribeMessage);
+                }
+
+                @Override
+                public void onMessage(String message) {
+                    try {
+                        ObjectMapper mapper = new ObjectMapper();
+                        JsonNode json = mapper.readTree(message);
+
+                        if (json.isArray() && json.size() > 1 && json.get(1).has("c")) {
+                            // "c" = last trade closed [ price, lot volume ]
+                            String pair = json.get(json.size() - 1).asText();
+                            BigDecimal price = new BigDecimal(json.get(1).get("c").get(0).asText());
+                            
+                            latestPrices.put(pair, price);
+                            System.out.println("Price update for " + pair + ": " + price);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error parsing message: " + message);
+                    }
+                }
+
+                @Override
+                public void onClose(int code, String reason, boolean remote) {
+                    System.out.println("WebSocket closed: " + reason);
+                }
+
+                @Override
+                public void onError(Exception ex) {
+                    ex.printStackTrace();
+                }
+            };
+
+            wsClient.connect();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    
+    public static BigDecimal getLatestPrice(String krakenPair) {
+    	
+    	if (krakenPair.equals("BTCUSD")) {
+    		krakenPair = "XBT/USD";
+    	}
+        return latestPrices.get(krakenPair);
     }
 
 }

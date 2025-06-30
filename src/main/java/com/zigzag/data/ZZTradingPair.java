@@ -1,4 +1,4 @@
-package com.zigzag.controller;
+package com.zigzag.data;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -6,16 +6,20 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.knowm.xchange.dto.Order.OrderType;
 import org.knowm.xchange.dto.marketdata.Trade;
+import org.knowm.xchange.dto.trade.LimitOrder;
 import org.knowm.xchange.kraken.dto.trade.KrakenOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,162 +28,114 @@ import com.zigzag.data.ZZCalculator;
 import com.zigzag.data.ZZPoint;
 import com.zigzag.data.ZZSummary;
 import com.zigzag.data.ZZTradePrediction;
+import com.zigzag.data.ZZWallet;
 import com.zigzag.markets.BinanceUSManager;
 import com.zigzag.markets.KrakenManager;
 import com.zigzag.predictor.OpenAIPredictor;
+import com.zigzag.services.AllExchangeServices;
+import com.zigzag.services.ExchangeService;
 import com.zigzag.services.KrakenService;
 
+public class ZZTradingPair {
 
 
-@RequestMapping("/api")
-@RestController
-public class ZZController {
-
-
-     @Autowired
-     private KrakenService krakenService;
      int cycleCount = 0;
      
-     Map<String, BigDecimal> balances = new HashMap<>();
-     Map<String, BigDecimal> usdBalances = new HashMap<>();
-    
+     
+      
      ScheduledExecutorService scheduler;
      List<ZZPoint> allbars = new ArrayList<>();
      List<ZZPoint> zigzag = new ArrayList<>();
      ZZTradePrediction prediction = new ZZTradePrediction();
      double balance  = 0;
-     List<KrakenOrder> orders=new ArrayList<>();
+     List<LimitOrder> orders=new ArrayList<>();
      List<Trade> trades=new ArrayList<>();
      
     boolean running = false;
     boolean scheduled = false;
     ZZSummary summary = new ZZSummary();
+    double latestPrice = 0;
     
     
-	 
-    @GetMapping("/hello")
-    public String hello() {
-        return "Hello from backend!";
-    }
-    
-    @GetMapping("/prediction")
-    public ResponseEntity<ZZTradePrediction> prediction() {
+ 
+    public ZZTradePrediction prediction() {
     	
-    	return ResponseEntity.ok(prediction);
+    	return prediction;
     }
     
-    @GetMapping("/status")
-    public ResponseEntity<String> status() {
+
+    public String status() {
     	try {
     		if (scheduled) {
     			if (running) {
-        			return ResponseEntity.status(HttpStatus.OK).body("running");
+        			return "running";
         		} else {
-        			return ResponseEntity.status(HttpStatus.OK).body("scheduled");
+        			return "scheduled";
         		}
     		} else {
-    			return ResponseEntity.status(HttpStatus.OK).body("stopped");
+    			return "stopped";
     		}
     		
         	
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()); // or return a structured error if needed
+            return "Error: "+e.getMessage(); // or return a structured error if needed
         }
     }
     
-    @GetMapping("/cycleCounter")
-    public ResponseEntity<String> cycleCounter() {
-    	return ResponseEntity.status(HttpStatus.OK).body(cycleCount+"");
+    public int cycleCounter() {
+    	return cycleCount;
     }
     
-    @GetMapping("/stop")
-    public ResponseEntity<String> stop() {
+
+    public String stop() {
     	try {
     		stopScheduledRun();
-        	return ResponseEntity.status(HttpStatus.OK).body("{}");
+        	return "";
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()); // or return a structured error if needed
+            return "Error: "+e.getMessage(); 
         }
     }
   
     
-    @GetMapping("/summary/header")
-    public ResponseEntity<ZZSummary> getSummaryHeader() {
+
+    public ZZSummary getSummaryHeader() {
     	//ZZSummary s = new ZZSummary();
-    	summary.setFrom(prediction, krakenService.getLatestPrice().doubleValue());
-        return ResponseEntity.ok(summary);
+    	summary.setFrom(prediction, latestPrice);
+        return summary;
     }
 
-    @GetMapping("/balance/base/{symbol}")
-    public ResponseEntity<Double> getBalancel(@PathVariable String symbol) {
-        return ResponseEntity.ok(balance);
+    public Double getBalance() {
+        return balance;
     }
 
-    @GetMapping("/trades/all")
-    public ResponseEntity<List<Trade>> getTrades() {
-        return ResponseEntity.ok(krakenService.getTrades());
+    public List<Trade> getTrades() {
+        return trades;
     }
 
-    @GetMapping("/trades/pair/{pair}")
-    public ResponseEntity<List<Trade>> getTrades(@PathVariable String pair) {
-        return ResponseEntity.ok(trades);
-    }
-    @GetMapping("/orders/all")
-    public ResponseEntity<Map<String, KrakenOrder>> getOrders() {
-        return ResponseEntity.ok(krakenService.getOrders());
+    public List<LimitOrder> getOrders() {
+        return orders;
     }
     
 
-    @GetMapping("/orders/pair/{pair}")
-    public ResponseEntity<List<KrakenOrder>> getOrders(@PathVariable String pair) {
-        return ResponseEntity.ok(orders);
+    public List<ZZPoint> getZigZags() {
+        return zigzag;
+    }
+ 
+    public List<ZZPoint> getAllBars() {
+          return allbars; // ✅ Automatically serialized as JSON
     }
     
-    @GetMapping("/balance/all")
-    public ResponseEntity< Map<String, BigDecimal>> getBalances() {
-        return ResponseEntity.ok(balances);
-    }
-    
-    @GetMapping("/usdbalance/all")
-    public ResponseEntity< Map<String, BigDecimal>> getUsdBalances() {
-        return ResponseEntity.ok(usdBalances);
-    }
-    
-    ///api/zigzag/XBTUSD?interval=60&leftBars=5&leftBars=5&percentChange=3
-    @GetMapping("/zigzag/zz/{pair}")
-    public ResponseEntity<List<com.zigzag.data.ZZPoint>> zigzagZZ(
-            @PathVariable String pair,
-            @RequestParam(defaultValue = "60") Integer interval,
-            @RequestParam(defaultValue = "5") Integer leftBars,
-            @RequestParam(defaultValue = "5") Integer rightBars,
-            @RequestParam(defaultValue = "3") Integer percentChange,
-            @RequestParam(defaultValue = "30") Integer daysBack) {
-
-        try {
-            return ResponseEntity.ok(zigzag); // ✅ Automatically serialized as JSON
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                 .body(Collections.emptyList()); // or return a structured error if needed
-        }
-    }
-    
-    @GetMapping("/zigzag/all/{pair}")
-    public ResponseEntity<List<ZZPoint>> zigzagAll() {
-          return ResponseEntity.ok(allbars); // ✅ Automatically serialized as JSON
-    }
-    
-    @GetMapping("/startbot")
-    public ResponseEntity<String> startBot(
-    		@RequestParam(defaultValue = "BTC") String base,
-            @RequestParam(defaultValue = "USD") String counter,
-            @RequestParam(defaultValue = "60") Integer interval,
-            @RequestParam(defaultValue = "5") Integer leftBars,
-            @RequestParam(defaultValue = "5") Integer rightBars,
-            @RequestParam(defaultValue = "3") Integer percentChange,
-            @RequestParam(defaultValue = "30") Integer daysBack) {
+    public String startBot(
+    		String base,
+            String counter,
+            Integer interval,
+            Integer leftBars,
+            Integer rightBars,
+            Integer percentChange,
+            Integer daysBack) {
+    	
     	summary.base = base;
     	summary.counter = counter;
     	summary.interval = interval;
@@ -190,10 +146,10 @@ public class ZZController {
         try {
         	scheduled = true;
         	startScheduledRun(base, counter, interval, leftBars, rightBars, percentChange, daysBack);
-        	return ResponseEntity.status(HttpStatus.OK).body("{}");
+        	return "{}";
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage()); // or return a structured error if needed
+            return "Error: "+e.getMessage(); // or return a structured error if needed
         }
     }
     
@@ -213,21 +169,19 @@ public class ZZController {
             running = true;
             cycleCount++;
             
-            krakenService.connectWebSocketTicker(pair);
+            //krakenService.connectWebSocketTicker(pair);
             
             List<ZZPoint> bars = new BinanceUSManager().getHistoricalData(pair, daysBack,interval);
             zigzag = ZZCalculator.calculateZigZag(bars, leftBars, rightBars, percentChange);
-            balance = krakenService.getBalance(base).doubleValue();
+     
             allbars = ZZCalculator.generateFeatureEnrichedZZPoints(bars, zigzag,false);
             prediction =  OpenAIPredictor.getPredictionFromGPT(zigzag);
             //System.out.println("ZigZag Pivot Points:");
             tryTrades(pair);
             
             Thread.sleep(2000);
-            orders = krakenService.getOrders(pair);
-            trades = krakenService.getTrades(pair);
-            balances = krakenService.getBalances();
-            usdBalances = krakenService.getBalancesInUSD();
+            orders = AllExchangeServices.getInstance().getOrders(pair);
+            trades = AllExchangeServices.getInstance().getTrades(pair);
             updateZZPointsWithTradesAndOrders();
             running = false;
         } catch (Exception e) {
@@ -238,15 +192,15 @@ public class ZZController {
 	private void tryTrades(String pair) {
 		//zigzag.forEach(System.out::println);
 
-		if (krakenService.latestPrices.size() > 0) {
-		    BigDecimal currentPrice = krakenService.getLatestPrice(pair);
+		if (KrakenManager.latestPrices.size() > 0) {
+		    BigDecimal currentPrice = KrakenManager.getLatestPrice(pair);
 		    if (prediction.isBuyNow(currentPrice)) {
-		        krakenService.placeBuyLimitOrderWithStopLoss(pair, new BigDecimal(getTradeAmount()), 
+		        AllExchangeServices.getInstance().placeBuyLimitOrderWithStopLoss(pair, new BigDecimal(getTradeAmount()), 
 		                new BigDecimal(currentPrice.doubleValue()*0.975), true);
 
 		    }
 		    if (prediction.isSellNow(currentPrice)) {
-		        krakenService.placeSellLimitOrderWithStopCancel(pair, new BigDecimal(getTradeAmount()), 
+		    	AllExchangeServices.getInstance().placeSellLimitOrderWithStopCancel(pair, new BigDecimal(getTradeAmount()), 
 		                new BigDecimal(currentPrice.doubleValue()*1.025), true);
 		    }
 		}
@@ -276,13 +230,13 @@ public class ZZController {
         return closest;
     }
     
-    public ZZPoint getClosestZZPoint(KrakenOrder order) {
-        if (allbars == null || allbars.isEmpty() || order == null || order.getOpenTimestamp() == 0) {
+    public ZZPoint getClosestZZPoint(LimitOrder order) {
+        if (allbars == null || allbars.isEmpty() || order == null || order.getTimestamp() == null) {
             return null;
         }
         ZZPoint closest = null;
         long minDiff = Long.MAX_VALUE;
-        long orderTime = (long) order.getOpenTimestamp();
+        long orderTime = (long) order.getTimestamp().getTime();
         for (ZZPoint point : allbars) {
             long pointTime = point.getDate().getTime();
             long diff = Math.abs(pointTime - orderTime);
@@ -315,7 +269,7 @@ public class ZZController {
         }
         // For each order, find the closest ZZPoint by date and attach order info
         if (orders != null) {
-            for (KrakenOrder order : orders) {
+            for (LimitOrder order : orders) {
                 ZZPoint closest = getClosestZZPoint(order);
                 
                 if (closest != null) {
@@ -335,10 +289,10 @@ public class ZZController {
                                   Integer daysBack) {
     	
         stopScheduledRun(); // Stop any existing scheduler before starting a new one
-        scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        scheduler = Executors.newSingleThreadScheduledExecutor();
         scheduler.scheduleAtFixedRate(
             () -> run(base, counter, interval, leftBars, rightBars, percentChange, daysBack),
-            0, 30, java.util.concurrent.TimeUnit.MINUTES
+            0, 30, TimeUnit.MINUTES
         );
     }
 
@@ -367,6 +321,29 @@ public class ZZController {
     
     @GetMapping("/zigzag")
     public String zigzag() {
+    	
+    	try {
+            String pair = "XBTUSD";  // Kraken trading pair
+            int interval = 60;       // 60 = hourly candles
+            int leftBars = 5;
+            int rightBars = 5;
+            double minPercentChange = 3;
+
+            List<ZZPoint> bars = KrakenManager.fetchOHLC(pair, interval);
+            List<ZZPoint> zigzag = ZZCalculator.calculateZigZag(bars, leftBars, rightBars, minPercentChange);
+
+            System.out.println("ZigZag Pivot Points:");
+            zigzag.forEach(System.out::println); 
+            return zigzag.toString();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return "{\"Error\" :\"Not Found\"}";
+    }
+    
+    @GetMapping("/markets")
+    public String markets() {
     	
     	try {
             String pair = "XBTUSD";  // Kraken trading pair

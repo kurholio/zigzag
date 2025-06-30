@@ -4,8 +4,7 @@ import java.util.Date;
 
 import org.knowm.xchange.dto.Order.OrderType;
 import org.knowm.xchange.dto.marketdata.Trade;
-import org.knowm.xchange.kraken.Kraken;
-import org.knowm.xchange.kraken.dto.trade.KrakenOrder;
+import org.knowm.xchange.dto.trade.LimitOrder;
 
 public class ZZPoint {
     public long timestamp;
@@ -23,7 +22,7 @@ public class ZZPoint {
     public double momentum = 0.0;
     public double volatility = 0.0;
     private Trade trade;
-    private KrakenOrder order;
+    private LimitOrder order;
     public boolean saleTrade = false;
     public boolean buyTrade = false;
     
@@ -72,11 +71,11 @@ public class ZZPoint {
         return new Date(timestamp);
     }   
 
-    public void setOrder(KrakenOrder order) {
+    public void setOrder(LimitOrder order) {
         this.order = order;
     }
 
-    public KrakenOrder getOrder() {
+    public LimitOrder getOrder() {
         return this.order;
     }
 
